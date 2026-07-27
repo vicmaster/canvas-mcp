@@ -99,6 +99,9 @@ export async function startViewer(port: number): Promise<number> {
           id: canvas.id,
           name: canvas.name,
           lastModified: canvas.lastModified,
+          // Content hash for the poll loop — catches edits that don't bump
+          // lastModified (hand-edited repo JSON, metadata stamps; issue #150).
+          contentKey: evalCacheKey(canvas),
           width: canvas.root.width,
           height: canvas.root.height,
         }));
@@ -782,12 +785,31 @@ ${FAVICON_HTML}
  * human reviewer sees the same score + cliché tells the agent sees over MCP.
  * Read-only: computed for display, never written back to the scene graph. */
 
-// Cache fast-eval by canvas id + mtime so the gallery doesn't re-score every
-// canvas on every reload. Bounded — drop the oldest when it grows past a cap.
+// Cache fast-eval by a content hash of everything the evaluation actually
+// reads — the node tree, the merged tokens, the genre (provenance preset),
+// and the component registry. NOT lastModified: metadata edits and hand-edits
+// of a repo-bound file don't reliably bump it (issue #150), and a stale score
+// that survives a legitimate fix makes the fix look broken. Bounded — drop
+// the oldest when it grows past a cap.
 const scoreCache = new Map<string, EvaluationResult>();
+
+/** FNV-1a over the evaluation's actual inputs. Exported for tests. */
+export function evalCacheKey(canvas: Canvas): string {
+  const genre = (canvas.metadata?.provenance as { preset?: string } | undefined)?.preset ?? '';
+  let tokens = '';
+  try { tokens = JSON.stringify(getCanvasTokens(canvas)); } catch { /* mirrored canvas with no live project — tree + genre still key it */ }
+  const payload = `${JSON.stringify(canvas.root)}|${tokens}|${genre}|${JSON.stringify(canvas.components ?? {})}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < payload.length; i++) {
+    h ^= payload.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `${canvas.id}:${(h >>> 0).toString(36)}`;
+}
+
 async function evalFor(canvas: Canvas): Promise<EvaluationResult | null> {
   if (!canvas.root.children || canvas.root.children.length === 0) return null; // empty → no score
-  const key = `${canvas.id}:${canvas.lastModified}`;
+  const key = evalCacheKey(canvas);
   const hit = scoreCache.get(key);
   if (hit) return hit;
   try {
@@ -1283,6 +1305,7 @@ ${FAVICON_HTML}
   <script>
     const canvasId = '${canvas.id}';
     let lastModified = '${canvas.lastModified}';
+    let contentKey = '${evalCacheKey(canvas)}';
     let currentBp = 'desktop';
 
     // Phase 21 — point-and-tell: initial feedback entries + node labels for
@@ -1296,8 +1319,10 @@ ${FAVICON_HTML}
         const res = await fetch('/api/canvas/' + canvasId + '/meta');
         const meta = await res.json();
         document.getElementById('status').className = 'status';
-        if (meta.lastModified !== lastModified) {
+        // contentKey catches edits that never bump lastModified (issue #150).
+        if (meta.lastModified !== lastModified || (meta.contentKey && meta.contentKey !== contentKey)) {
           lastModified = meta.lastModified;
+          contentKey = meta.contentKey || contentKey;
           refreshFrames();
           // Update JSON if panel is open
           if (document.getElementById('json-panel').classList.contains('open')) loadJson();
