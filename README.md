@@ -38,7 +38,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 | **Quality & taste** | `canvas_evaluate` (6 categories + cliché tells) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` |
 | **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
-| **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift |
+| **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift · `framesmith verify` / `check-drift` CLI for CI/pre-commit gates, no MCP client needed |
 | **Viewer** | Browser gallery + detail view · quality inspector (score, issues, click-to-highlight) · design-system token panel · point-and-tell feedback (Comment mode + Feedback tab) |
 | **Open by design** | MIT · plain HTML/CSS · open JSON you own in your repo · content-hash versioning (`canvas_version`) so approvals reference an exact design, not just a name · works with any MCP-compatible client |
 
@@ -549,7 +549,7 @@ Drift detection — the design-of-record as a **living contract**. Re-imports a 
 
 Returns the diff image (changed regions in red), `changePercent`, `changedPixels`/`totalPixels`, and the import report. Both sides render at scale 1, so the percentage is comparable run-to-run — an unchanged page diffs at ~0%.
 
-**CI pattern** (a pattern, not a shipped feature): after deploy, call `canvas_sync_from_url` for each route ↔ canvas pair and fail the job when `changePercent` exceeds your threshold — design ↔ code divergence becomes a build failure instead of a surprise.
+**CI pattern** (a pattern, not a shipped feature — pixel thresholds are workload-specific): after deploy, call `canvas_sync_from_url` for each route ↔ canvas pair and fail the job when `changePercent` exceeds your threshold — design ↔ code divergence becomes a build failure instead of a surprise. For structural drift, the check below has a shipped CLI form, so you don't have to wire this pattern yourself.
 
 Pixel-level only — it tells you *how much* changed, not *what*. For that, see `canvas_check_drift` below.
 
@@ -567,6 +567,25 @@ Structural drift detection — where `canvas_sync_from_url` answers *"how much d
 Mostly-numeric texts are treated as data, not structure, so live figures don't false-flag; unmatched page text is reported as a count, never per-string noise. Takes the same params as `canvas_sync_from_url` (`canvasId`, `url`, `viewport`, `selector`, `waitFor`, `auth`). Returns `{ inSync, findings, counts, versionHash, verdict }` — `inSync` is true only with zero error/warning findings.
 
 Run it when picking up a canvas that describes a shipped view — designing on a drifted canvas means faithfully restyling a fiction. On findings, reconcile deliberately: update the canvas, fix the implementation, or flag the difference — never silently annotate it away.
+
+### CLI: `framesmith check-drift` / `framesmith verify`
+
+The same two gate checks, runnable where they fail loudly — CI or a pre-commit hook, no MCP client involved:
+
+```bash
+npx framesmith verify kpi-revenue-driver-control --hash sha256:8014d416f924378b
+```
+
+```bash
+npx framesmith check-drift admin-stream-types --url https://staging.example.com/admin/stream_types
+```
+
+- **`verify <canvasIdOrName> --hash <sha256:…>`** — exit `0` when the recorded hash still matches, `1` when the design changed since it was recorded, `2` on error. Chrome-free and fast enough for a pre-commit hook.
+- **`check-drift <canvasIdOrName> --url <url>`** — structural drift against the live page; exit `0` in sync / `1` drifted / `2` error. Needs Chrome. Extra flags: `--viewport WxH`, `--selector <css>`, `--wait-for <selector|ms>`.
+- Shared: `--project-dir <dir>` (where the `.framesmith/` discovery walk starts, default cwd — in CI, point it at the checkout) and `--json` for machine-readable output. Canvases resolve by id or exact name; an ambiguous name is an error — a gate must never check the wrong canvas.
+- Gated pages (auth headers/cookies) are the MCP tool's job — credentials don't belong in shell history.
+
+`npx framesmith` with no arguments still starts the MCP server; only these exact subcommands (plus `help`) are intercepted.
 
 ### `canvas_version`
 
