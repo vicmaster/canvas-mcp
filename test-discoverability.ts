@@ -137,6 +137,33 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── 8. gate-integrity vocabulary is surfaced where agents look ───────────────
+// Phase 23 (#148/#149): the drift finding kinds (mirrors the DriftFindingKind
+// union in drift.ts) and the approval hash field must stay on the agent
+// surfaces — a finding kind an agent can't interpret is noise, and versionHash
+// is the whole falsifiability story.
+{
+  const driftSrc = readFileSync('src/drift.ts', 'utf-8');
+  const union = driftSrc.match(/export type DriftFindingKind =([\s\S]*?);/)?.[1] ?? '';
+  const kinds = [...union.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+  expect('drift finding kinds found', kinds.length >= 4, kinds.join(', '));
+  const missingIdx = kinds.filter((k) => !indexSrc.includes(k));
+  expect('every drift finding kind in src/index.ts', missingIdx.length === 0, missingIdx.join(', '));
+  const missingGl = kinds.filter((k) => !guidelines.includes(k));
+  expect('every drift finding kind in GUIDELINES', missingGl.length === 0, missingGl.join(', '));
+  const missingRm = kinds.filter((k) => !readme.includes(k));
+  expect('every drift finding kind in README', missingRm.length === 0, missingRm.join(', '));
+
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    expect(`versionHash documented in ${surface[0]}`, surface[1].includes('versionHash'));
+  }
+  // The CLI subcommands are part of the contract too (GUIDELINES + README).
+  for (const cmd of ['check-drift', 'verify']) {
+    expect(`CLI "framesmith ${cmd}" in GUIDELINES`, guidelines.includes(`framesmith ${cmd}`));
+    expect(`CLI "framesmith ${cmd}" in README`, readme.includes(`framesmith ${cmd}`));
+  }
+}
+
 let allPass = true;
 for (const c of checks) {
   if (!c.ok) allPass = false;
