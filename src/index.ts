@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { createCanvas, getCanvas, listCanvases, findNode, touchCanvas, loadPersistedCanvases, archiveCanvas, unarchiveCanvas, moveCanvas, deleteCanvas, countCanvasesInProject, ensureFresh, collectMatchingNodes, replaceMatchingProperties, findNodesDetailed } from './scene-graph.js';
+import { canvasVersionHash } from './version.js';
 import { loadPersistedWorkspaces, ensureDefaultWorkspaceAndProject, createWorkspace, listWorkspaces, renameWorkspace, deleteWorkspace, createProject, getProject, getWorkspace, listProjects, renameProject, deleteProject, setWorkspaceDesignSystem, getWorkspaceDesignSystem, setProjectDesignSystem, getProjectDesignSystem, getCanvasTokens, getInheritedTokens, loadRepoWorkspace } from './workspaces.js';
 import { DEFAULT_PROJECT_ID, DEFAULT_WORKSPACE_ID } from './types.js';
 import { detectBinding, projectStartDir, readWorkspaceFile, setRepoBackend, registerRepo, migrateLegacyHome, appendBuildLog, recordPresetInBuildLog, readBuildLog } from './repo-store.js';
@@ -168,7 +169,7 @@ server.tool(
 // --- canvas_list ---
 server.tool(
   'canvas_list',
-  'List canvases. By default returns all non-archived canvases. Filter by `projectId` to scope to one project. Set `includeArchived: true` to include archived canvases in the result. A row carrying `openFeedback: n` has open point-and-tell comments from the user waiting — read them with get_feedback before working on (or presenting) that canvas.',
+  'List canvases. By default returns all non-archived canvases. Filter by `projectId` to scope to one project. Set `includeArchived: true` to include archived canvases in the result. A row carrying `openFeedback: n` has open point-and-tell comments from the user waiting — read them with get_feedback before working on (or presenting) that canvas. Every row carries a `versionHash` — the design-content hash canvas_version checks approvals against, so a gate can populate its records from this listing alone.',
   {
     projectId: z.string().optional().describe('Only list canvases in this project'),
     includeArchived: z.boolean().optional().describe('Include archived canvases in the result (default false)'),
@@ -950,7 +951,9 @@ server.tool(
       exportedFiles.push(filePath);
     }
 
-    return { content: [{ type: 'text', text: JSON.stringify({ exported: exportedFiles }, null, 2) }, ...fontWarningContent(fontWarnings)] };
+    // versionHash ties the exported artifact to the exact design it rendered
+    // (Phase 23 slice A — an approval screenshot is checkable later).
+    return { content: [{ type: 'text', text: JSON.stringify({ exported: exportedFiles, versionHash: canvasVersionHash(canvas) }, null, 2) }, ...fontWarningContent(fontWarnings)] };
   }
 );
 
@@ -1378,6 +1381,33 @@ The design-of-record becomes a living contract: run this after deploys, or wire 
     } catch (err) {
       return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
     }
+  }
+);
+
+// --- canvas_version (Phase 23 slice A, #149) ---
+server.tool(
+  'canvas_version',
+  `The falsifiable half of a design-approval gate: returns the canvas's versionHash — a stable content hash (sha256:<16 hex>) of the DESIGN itself (node tree, canvas tokens, components, fonts). Metadata never moves it: feedback arriving or being resolved, critique stamps, and provenance changes all leave the hash unchanged, so an approval recorded against a hash survives everything except an actual design change.
+
+Record { canvasId, versionHash } wherever approvals live (a YAML file, a PR comment — that's the consumer's concern); later, pass the recorded hash as expectedHash and the result's "matches" boolean tells you whether the approved canvas is still the current design. canvas_list rows carry the same versionHash, so a gate can populate its records from a listing alone. The hash is process- and machine-independent — the same checked-in repo canvas hashes identically everywhere.`,
+  {
+    canvasId: z.string().describe('Canvas ID'),
+    expectedHash: z.string().optional().describe('A previously recorded versionHash to check against — the result gains matches: true/false'),
+  },
+  async ({ canvasId, expectedHash }) => {
+    ensureFresh(canvasId); // hash what's on disk, not a stale in-memory copy
+    const canvas = getCanvas(canvasId);
+    if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
+    const versionHash = canvasVersionHash(canvas);
+    return {
+      content: [{ type: 'text', text: JSON.stringify({
+        canvasId,
+        name: canvas.name,
+        versionHash,
+        lastModified: canvas.lastModified,
+        ...(expectedHash !== undefined ? { matches: versionHash === expectedHash } : {}),
+      }, null, 2) }],
+    };
   }
 );
 

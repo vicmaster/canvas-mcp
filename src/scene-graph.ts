@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { DEFAULT_PROJECT_ID, type Canvas, type SceneNode } from './types.js';
 import { isRepoBound, repoDir, writeCanvasToDir, removeCanvasFromDir, loadCanvasesFromDir, externallyModified, readCanvasFile } from './repo-store.js';
+import { canvasVersionHash } from './version.js';
 
 const store = new Map<string, Canvas>();
 
@@ -221,6 +222,10 @@ export interface CanvasSummary {
   name: string;
   createdAt: string;
   lastModified: string;
+  /** Phase 23 slice A (#149) — content hash of the design (tree + tokens +
+   * components + fonts, metadata excluded). Record it in approval records;
+   * check it later via canvas_version's expectedHash. */
+  versionHash: string;
   projectId: string;
   archived: boolean;
   /** Phase 21 slice C — open point-and-tell comments. Present only when > 0
@@ -238,6 +243,7 @@ export function listCanvases(): CanvasSummary[] {
       name: c.name,
       createdAt: c.createdAt,
       lastModified: c.lastModified,
+      versionHash: canvasVersionHash(c),
       projectId: c.projectId,
       archived: c.archived === true,
       ...(openFeedback > 0 ? { openFeedback } : {}),
