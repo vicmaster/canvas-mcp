@@ -70,11 +70,36 @@ export interface EvaluationResult {
   };
   mode: 'fast' | 'detailed' | 'llm';
   /**
+   * Present whenever the cliche category ran (issue #152). Genre choice is
+   * consequential — the relaxation table decides whether a canvas can score at
+   * all — so the result says which genre was active, where it came from, what
+   * it relaxed, and which tells a DIFFERENT genre would have relaxed. That last
+   * list surfaces the tradeoff at decision time instead of after a wasted
+   * evaluation cycle.
+   */
+  genre?: GenreReport;
+  /**
    * Present only when mode is 'llm'. The heuristic categories above still run
    * (so you don't lose the deterministic signal); this field carries the
    * vision-model's holistic critique on top.
    */
   llmCritique?: import('./llm-judge.js').LLMJudgeResult;
+}
+
+export interface GenreReport {
+  /** The genre the cliche checks ran under, or null when none was set. */
+  active: string | null;
+  /** Where the active genre came from: the explicit `genre` option, the canvas
+   * provenance stamp (metadata.provenance.preset), or null when unset. */
+  source: 'explicit' | 'provenance' | null;
+  /** Tells the active genre relaxed (skipped entirely). Empty when the active
+   * genre is unknown to the relaxation table — a signal the stamp isn't doing
+   * what the author may think. */
+  relaxed: ClicheTell[];
+  /** Tells that stayed ACTIVE but would be relaxed by some other genre —
+   * e.g. under "dashboard", accent-hue/pure-black-white still flag but
+   * "material" would relax them. */
+  notRelaxed: Array<{ tell: ClicheTell; relaxedBy: string[] }>;
 }
 
 interface NodeEntry {
@@ -655,6 +680,30 @@ const RELAXED_BY_GENRE: Record<string, ClicheTell[]> = {
   dashboard: ['honest-content'],
   data: ['honest-content'],
 };
+
+/** Issue #152 — make the genre decision visible in the evaluate result: which
+ * genre ran, where it came from, what it relaxed, and which tells a DIFFERENT
+ * genre would have relaxed (the tradeoff that's otherwise only discoverable by
+ * watching the score move). `data` is folded into `dashboard` in relaxedBy so
+ * the alias doesn't read as a second option. */
+function buildGenreReport(genre: string | undefined, explicit: boolean, relaxed: Set<ClicheTell>): GenreReport {
+  const notRelaxed = new Map<ClicheTell, string[]>();
+  for (const [g, tells] of Object.entries(RELAXED_BY_GENRE)) {
+    if (g === 'data') continue; // alias of dashboard
+    for (const tell of tells) {
+      if (relaxed.has(tell)) continue;
+      const by = notRelaxed.get(tell) ?? [];
+      if (!by.includes(g)) by.push(g);
+      notRelaxed.set(tell, by);
+    }
+  }
+  return {
+    active: genre ?? null,
+    source: explicit ? 'explicit' : genre !== undefined ? 'provenance' : null,
+    relaxed: [...relaxed],
+    notRelaxed: [...notRelaxed].map(([tell, relaxedBy]) => ({ tell, relaxedBy })),
+  };
+}
 
 /** Canonical unconfigured AI accents — Tailwind indigo/violet/purple defaults,
  * lowercased. An exact match gets a mechanical autofix; a near-purple literal
@@ -1291,6 +1340,7 @@ export async function evaluateCanvas(
       results.set('consistency', checkConsistency(entries));
     }
   }
+  let genreReport: GenreReport | undefined;
   if (activeCategories.includes('cliche')) {
     // Genre comes from the explicit option, else the Phase 11 provenance stamp.
     const genre = options.genre ?? canvas.metadata?.provenance?.preset;
@@ -1298,6 +1348,7 @@ export async function evaluateCanvas(
     // Resolved entries → $accent becomes a real hex for hue math; rawEntries →
     // distinguish a literal default purple (autofixable) from a $token one.
     results.set('cliche', checkCliche(entries, rawEntries, mergedTokens, { relaxed }));
+    genreReport = buildGenreReport(genre, options.genre !== undefined, relaxed);
   }
 
   const overallScore = aggregateScores(results, CATEGORY_WEIGHTS);
@@ -1335,6 +1386,7 @@ export async function evaluateCanvas(
     overallScore,
     categories,
     issues: allIssues,
+    ...(genreReport ? { genre: genreReport } : {}),
     summary: generateSummary(overallScore, categories, allIssues),
     stats: {
       totalNodes,

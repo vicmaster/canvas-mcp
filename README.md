@@ -610,12 +610,14 @@ The **`directive`** is the operating contract that keeps unfinished work off the
 
 Open point-and-tell comments block too: when the canvas has any, the result carries `openFeedback: n` and the directive stays blocking even at a READY score — the human's note outranks the heuristics. Read them with `get_feedback`, address each, close them with `resolve_feedback`.
 
+Whenever the `cliche` category runs, the result also carries a **`genre`** field auditing the genre decision: `{ active, source, relaxed, notRelaxed }` — the genre in effect, whether it came from the `genre` param or the canvas's provenance stamp, the tells it relaxed, and `notRelaxed` (`[{ tell, relaxedBy }]`) — tells still flagging that a *different* genre would relax. A score pinned by tells listed in `notRelaxed` usually means the wrong genre was declared.
+
 | Param | Type | Description |
 |-------|------|-------------|
 | `canvasId` | string | Canvas ID to evaluate |
 | `mode` | `"fast"` \| `"detailed"` \| `"llm"` | `"fast"` = JSON-tree analysis only (<100ms). `"detailed"` adds Puppeteer-based pixel-level overlap checks. `"llm"` runs fast-mode heuristics plus a vision-model critique (provider picked from `FRAMESMITH_LLM_PROVIDER` or whichever of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` is set — costs one paid API call per invocation). Default `"fast"`. |
 | `categories` | string[]? | Subset of `spacing`, `color`, `typography`, `structure`, `consistency`, `cliche`. Defaults to all. |
-| `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped. |
+| `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped. Pick by what the screen is *for* (read screens with published figures → `dashboard`; editors/admin forms → `material`), not what it contains — the result's `genre` field audits the choice. |
 
 **Categories and what they check**
 
@@ -646,6 +648,7 @@ Open point-and-tell comments block too: when the canvas has any, the result carr
   "summary": "Overall quality: Good (87/100). Strongest: spacing (90/100). Weakest: color (75/100)...",
   "stats": { "totalNodes": 14, "textNodes": 5, "frameNodes": 8, "maxDepth": 4, "tokenUsagePercent": 61, "componentReusePercent": 0 },
   "mode": "fast",
+  "genre": { "active": null, "source": null, "relaxed": [], "notRelaxed": [{ "tell": "accent-hue", "relaxedBy": ["material"] }] },
   "directive": "NOT READY — 87/100 with 1 issue(s) to resolve. Fix them now: canvas_autofix for the mechanical subset, batch_design for the rest, then re-run canvas_evaluate. Repeat until there are zero warnings/cliché tells and the score is > 95. Do NOT show this design to the user yet."
 }
 ```

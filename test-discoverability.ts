@@ -128,6 +128,13 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   expect('every relax-genre named in src/index.ts', missingIdx.length === 0, missingIdx.join(', '));
   const missingGl = genres.filter((g) => !guidelines.includes(`"${g}"`));
   expect('every relax-genre named in GUIDELINES', missingGl.length === 0, missingGl.join(', '));
+
+  // Issue #152 — the evaluate result's genre report ({ active, source,
+  // relaxed, notRelaxed }) must stay documented on the agent surfaces.
+  for (const field of ['notRelaxed', 'relaxedBy']) {
+    expect(`genre-report field "${field}" documented in src/index.ts`, indexSrc.includes(field));
+    expect(`genre-report field "${field}" documented in GUIDELINES`, guidelines.includes(field));
+  }
 }
 
 let allPass = true;
