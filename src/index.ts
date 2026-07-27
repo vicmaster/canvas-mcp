@@ -1585,6 +1585,7 @@ server.tool(
         content: [{ type: 'text', text: JSON.stringify({
           totalIssues: result.issues.length,
           fixableCount: fixes.length,
+          ...(result.genre ? { genre: result.genre } : {}),
           ...(apply ? { applied: 0, note: 'apply: true had nothing to write' } : {}),
           fixes,
         }, null, 2) }],
@@ -1604,6 +1605,7 @@ server.tool(
       content: [{ type: 'text', text: JSON.stringify({
         totalIssues: result.issues.length,
         fixableCount: fixes.length,
+        ...(result.genre ? { genre: result.genre } : {}),
         appliedCount: applied.length,
         applied,
         ...(failed.length ? { failed } : {}),
