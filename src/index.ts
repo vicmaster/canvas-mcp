@@ -1392,7 +1392,7 @@ server.tool(
 
 Finding kinds: missing-in-page (the canvas shows something the page doesn't have — a phantom column, a control that was never built), missing-in-canvas (the page grew something the canvas doesn't show), control-mismatch (e.g. the canvas has a radio group ("Notification type"); the page has a select), table-mismatch (column/header divergence; row-count differences are info-only — data length isn't drift). Mostly-numeric texts are treated as data, not structure, so live figures don't false-flag; unmatched page text is a count, never per-string noise. inSync is true only when there are zero error/warning findings.
 
-Run this when PICKING UP a canvas that describes a shipped view — designing on a drifted canvas means faithfully restyling a fiction. On findings, reconcile DELIBERATELY: update the canvas (batch_design / canvas_import_url), fix the implementation, or flag the difference to the user — never silently annotate it away. The result carries the canvas's versionHash so a gate can record what was checked. Same live-page controls as canvas_import_url (viewport / selector / waitFor / auth — auth stays in a throwaway context, never persisted).`,
+Run this when PICKING UP a canvas that describes a shipped view — designing on a drifted canvas means faithfully restyling a fiction. On findings, reconcile DELIBERATELY: update the canvas (batch_design / canvas_import_url), fix the implementation, or flag the difference to the user — never silently annotate it away. The result carries the canvas's versionHash so a gate can record what was checked. Same live-page controls as canvas_import_url (viewport / selector / waitFor / auth — auth stays in a throwaway context, never persisted). CI/pre-commit can run the same check without an MCP client: \`npx framesmith check-drift <canvasIdOrName> --url <url>\` exits 1 on drift.`,
   {
     canvasId: z.string().describe('The canvas that is the design-of-record'),
     url: z.string().regex(/^https?:\/\//i).describe('The live page to compare against (http/https)'),
@@ -1441,7 +1441,7 @@ server.tool(
   'canvas_version',
   `The falsifiable half of a design-approval gate: returns the canvas's versionHash — a stable content hash (sha256:<16 hex>) of the DESIGN itself (node tree, canvas tokens, components, fonts). Metadata never moves it: feedback arriving or being resolved, critique stamps, and provenance changes all leave the hash unchanged, so an approval recorded against a hash survives everything except an actual design change.
 
-Record { canvasId, versionHash } wherever approvals live (a YAML file, a PR comment — that's the consumer's concern); later, pass the recorded hash as expectedHash and the result's "matches" boolean tells you whether the approved canvas is still the current design. canvas_list rows carry the same versionHash, so a gate can populate its records from a listing alone. The hash is process- and machine-independent — the same checked-in repo canvas hashes identically everywhere.`,
+Record { canvasId, versionHash } wherever approvals live (a YAML file, a PR comment — that's the consumer's concern); later, pass the recorded hash as expectedHash and the result's "matches" boolean tells you whether the approved canvas is still the current design. canvas_list rows carry the same versionHash, so a gate can populate its records from a listing alone. The hash is process- and machine-independent — the same checked-in repo canvas hashes identically everywhere. CI/pre-commit can run the same check without an MCP client: \`npx framesmith verify <canvasIdOrName> --hash <hash>\` exits 1 on mismatch.`,
   {
     canvasId: z.string().describe('Canvas ID'),
     expectedHash: z.string().optional().describe('A previously recorded versionHash to check against — the result gains matches: true/false'),
@@ -1929,7 +1929,16 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error('Failed to start framesmith:', err);
-  process.exit(1);
-});
+// Phase 23 slice C — CLI dispatch (spec C5). EXACT subcommand names only:
+// anything else (including flags an MCP client might pass) falls through to
+// the server unchanged, so `npx framesmith` keeps booting as the MCP server.
+const CLI_COMMANDS = new Set(['check-drift', 'verify', 'help', '--help', '-h']);
+if (CLI_COMMANDS.has(process.argv[2])) {
+  const { runCli } = await import('./cli.js');
+  process.exit(await runCli(process.argv.slice(2)));
+} else {
+  main().catch((err) => {
+    console.error('Failed to start framesmith:', err);
+    process.exit(1);
+  });
+}

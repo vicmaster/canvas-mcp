@@ -464,7 +464,7 @@ Downstream teams use canvases as a design gate, and two incidents from one sessi
 
 - [x] Slice A — version hash: `canvasVersionHash` (canonical SHA-256 over design content), `canvas_version` tool with `expectedHash` check, surfaced on `canvas_list`/`export` (#149)
 - [x] Slice B — structural drift: pure `computeStructuralDrift` engine (missing-in-page / missing-in-canvas / control-mismatch / table-mismatch) + ephemeral `canvas_check_drift` tool (#148)
-- [ ] Slice C — CLI: `framesmith check-drift` / `framesmith verify` subcommands with CI-friendly exit codes (#148, #149)
+- [x] Slice C — CLI: `framesmith check-drift` / `framesmith verify` subcommands with CI-friendly exit codes (#148, #149)
 - [ ] Slice D — agent surfaces: drift-check-before-designing workflow in INSTRUCTIONS/GOTCHAS/GUIDELINES/README + discoverability guards
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-23-SPEC.md`](docs/specs/PHASE-23-SPEC.md)._
