@@ -11,7 +11,7 @@ import { loadPersistedWorkspaces, ensureDefaultWorkspaceAndProject, createWorksp
 import { DEFAULT_PROJECT_ID, DEFAULT_WORKSPACE_ID } from './types.js';
 import { detectBinding, projectStartDir, readWorkspaceFile, setRepoBackend, registerRepo, migrateLegacyHome, appendBuildLog, recordPresetInBuildLog, readBuildLog } from './repo-store.js';
 import { bindRepo, initWorkspace } from './bind.js';
-import { parseAndExecute } from './operations.js';
+import { parseAndExecute, ignoredShadowWarning } from './operations.js';
 import { promoteToComponent, copyNodesAcross } from './components.js';
 import { resolveVariables, setVariables, getVariables, applyPresetTokens } from './variables.js';
 import { renderToHtml, type RenderOptions } from './renderer.js';
@@ -67,7 +67,7 @@ Point-and-tell feedback: the user toggles Comment mode in the viewer and clicks 
 
 Gotchas (current sharp edges):
 - Row rules and accent bars are per-side borders — borderTop: { width: 1, color: "$border" } on each table row, borderLeft: { width: 3, color: "$primary" } for an accent edge (style "dashed"|"dotted" for forecast/draft outlines; strokeDasharray dashes SVG paths). Never fake hairlines with gap: 1 + background bleed-through.
-- Prefer STRUCTURED gradient / shadows ({ stops: [...] } and [{ x, y, blur, color }]); a raw CSS string on those fields is accepted too.
+- Prefer STRUCTURED gradient / shadows ({ stops: [...] } and [{ x, y, blur, color }]); a raw CSS string on those fields is accepted too. The plural \`shadows\` always beats the singular \`shadow\` — writing \`shadow\` on a node that has \`shadows\` is a no-op (batch_design warns when this happens).
 - import_design_md reliably imports spacing + component skeletons; colors / typography / radius parsing is lossy — set those explicitly via set_variables.`;
 
 const server = new McpServer({
@@ -104,7 +104,7 @@ const GOTCHAS = [
   'Imports reconstruct STRUCTURE: tables → proportional columns, grids → rows from the computed template, centered/max-width content stays centered, other multi-column CSS clusters by geometry. Check report.layout — a "stack-fallback" entry names a container that needs hand-fixing; everything else arrived structurally correct, so do not rebuild it.',
   'Fonts: a fontFamily named in a typography token loads automatically (Google Fonts, cached locally); typography.body.fontFamily sets the document default. "mono" / "sans" are generic shorthands (render as monospace / sans-serif, no registration). batch_design warns at write time when a family is not yet servable; a "Font warnings" item in a screenshot result means the named face is NOT rendering — fix the name or register it via set_fonts (with a css2 URL, YOUR family label is what gets registered).',
   'Row rules / accent bars: per-side borders — borderTop: { width: 1, color: "$border" } per table row, borderLeft: { width: 3, color: "$primary" } for accent edges; style "dashed"|"dotted" marks forecast/draft; strokeDasharray ("6 4") dashes SVG paths. Never fake hairlines with gap: 1 + fill bleed-through.',
-  'Prefer structured gradient / shadows ({ stops: [...] } and [{ x, y, blur, color }]); a raw CSS string on those fields is accepted too.',
+  'Prefer structured gradient / shadows ({ stops: [...] } and [{ x, y, blur, color }]); a raw CSS string on those fields is accepted too. The plural `shadows` always beats the singular `shadow` — writing `shadow` on a node that has `shadows` is a no-op (batch_design warns when this happens).',
   'import_design_md reliably imports spacing + component skeletons; set colors / typography / radius explicitly via set_variables.',
   'Binding (canvas_bind, or init on first run) re-keys every project / canvas ID to repo-* form — use the IDs init returns, never cache pre-bind IDs.',
   'Point-and-tell feedback: the user clicks elements in the viewer (Comment mode) to leave node-anchored or whole-page comments, stored on the canvas at metadata.feedback. get_feedback returns them (with a node snapshot; orphaned: true = the node is gone but the concern likely still applies); open feedback blocks presenting, same as open inspector comments — address each item, then resolve_feedback with a one-line note of what changed (shown as your reply in the viewer\'s Feedback tab). canvas_list rows and canvas_evaluate results carry an openFeedback count (and the evaluate directive stays blocking) while comments are open.',
@@ -469,7 +469,7 @@ Concatenate bindings: U(header+"/childId", {...})
 Returns { ok, nodeIds, results }: nodeIds maps each bound variable to the node ID it created (e.g. { "header": "n_a1b2" }) — record it and use those IDs to target nodes in later calls (bindings only live within a single call). results lists each op's outcome in order. If the call wrote a fontFamily nothing can serve yet (not cached, not registered, not system/generic), an extra "Font warnings" content item names it — cache-only check, no network, so it can't catch everything set_fonts/network resolution would.
 
 Node types: frame, text, rectangle, ellipse, image, icon, path, component, instance, toggle, checkbox, radio, select, chart
-Properties: fill, gradient, stroke, strokeWidth, strokeStyle, borderTop, borderRight, borderBottom, borderLeft, cornerRadius, width, height, minWidth, maxWidth, layout ("horizontal"|"vertical"), gap, padding, alignItems, justifyContent, fontSize, fontFamily, fontWeight, color, content, textAlign, lineHeight, letterSpacing (px), textDecoration, textTransform ("uppercase" etc. — don't bake casing into content), fontVariationSettings (variable-font axes, e.g. '"wght" 650'), src, objectFit, opacity, shadow, shadows, blur, backdropBlur, backdropFilter, overflow, wrap, position, x, y, icon, iconSize, iconColor, iconStyle, checked, disabled, value, d, viewBox, strokeLinecap, strokeLinejoin, strokeDasharray, animation, transition, kind, series, xDomain, yDomain, curve, gridlines, xLabels, yLabels, componentId, overrides, responsive
+Properties: fill, gradient, stroke, strokeWidth, strokeStyle, borderTop, borderRight, borderBottom, borderLeft, cornerRadius, width, height, minWidth, maxWidth, layout ("horizontal"|"vertical"), gap, padding, alignItems, justifyContent, fontSize, fontFamily, fontWeight, color, content, textAlign, lineHeight, letterSpacing (px), textDecoration, textTransform ("uppercase" etc. — don't bake casing into content), fontVariationSettings (variable-font axes, e.g. '"wght" 650'), src, objectFit, opacity, shadow, shadows (plural wins — a \`shadow\` written where \`shadows\` is set is ignored, and the op result carries a warning saying so), blur, backdropBlur, backdropFilter, overflow, wrap, position, x, y, icon, iconSize, iconColor, iconStyle, checked, disabled, value, d, viewBox, strokeLinecap, strokeLinejoin, strokeDasharray, animation, transition, kind, series, xDomain, yDomain, curve, gridlines, xLabels, yLabels, componentId, overrides, responsive
 
 Charts: { type: "chart", kind: "line"|"bar", series: [{ data: [210, 450, 648], stroke: "$accent", strokeDasharray?: "6 4", area?, points? }], yDomain?: [0, 2700], curve?: "smooth", gridlines?: 4, xLabels?: ["Jan", ..., "Dec"], yLabels? } — the node does ALL the value→coordinate math (multi-series in one node; x = data index, a shorter series stops early against a longer one; domains auto from data, bars floor at 0). Dash the projected/forecast series, solid the actuals. NEVER hand-compute path d-strings or absolutely-position tick labels for a chart.
 
@@ -591,10 +591,16 @@ ALWAYS preview with dryRun: true first when the match value could be common (wid
         : replaceMatchingProperties(canvas.root, match, set as Partial<SceneNode>, opts);
       if (!dryRun) touchCanvas(canvasId);
       const matches = matched.map((n) => ({ id: n.id, type: n.type, ...(n.name ? { name: n.name } : {}) }));
+      // Issue #151 — a `shadow` written where `shadows` is active is a silent
+      // no-op at render time; surface it per matched node instead.
+      const shadowWarned = dryRun ? [] : matched.filter((n) => ignoredShadowWarning(n, set));
+      const warning = shadowWarned.length
+        ? `\`shadow\` was ignored on ${shadowWarned.length} matched node(s) that also have \`shadows\`, which always wins at render time (${shadowWarned.slice(0, 5).map((n) => n.id).join(', ')}${shadowWarned.length > 5 ? ', …' : ''}). Put the value in \`shadows\`, or clear \`shadows\` first.`
+        : undefined;
       const viewerUrl = getViewerUrl();
       return {
         content: [
-          { type: 'text', text: JSON.stringify({ ok: true, ...(dryRun ? { dryRun: true } : {}), count: matches.length, matches }, null, 2) },
+          { type: 'text', text: JSON.stringify({ ok: true, ...(dryRun ? { dryRun: true } : {}), count: matches.length, matches, ...(warning ? { warning } : {}) }, null, 2) },
           ...(!dryRun && viewerUrl ? [{ type: 'text' as const, text: `View live: ${viewerUrl}/canvas/${canvasId}` }] : []),
         ],
       };
