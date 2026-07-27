@@ -458,6 +458,17 @@ Eight issues from one dogfooding session (a financial dashboard: #129–#136) sh
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-22-SPEC.md`](docs/specs/PHASE-22-SPEC.md). All slices shipped — Phase 22 complete._
 
+### Phase 23 — Design gate integrity (v1.10)
+
+Downstream teams use canvases as a design gate, and two incidents from one session (#148, #149) show the gate can't keep its own promise: canvases silently drift from the shipped view (a radiogroup that was never built; a STATUS column that no longer exists), and approvals reference canvases by name — a point-in-time judgment recorded as a permanent, unversioned fact. Give the gate something falsifiable: a stable content hash per canvas, a structural drift report against the live view, and a CLI so CI fails loudly instead of waiting for a human to notice.
+
+- [ ] Slice A — version hash: `canvasVersionHash` (canonical SHA-256 over design content), `canvas_version` tool with `expectedHash` check, surfaced on `canvas_list`/`export` (#149)
+- [ ] Slice B — structural drift: pure `computeStructuralDrift` engine (missing-in-page / missing-in-canvas / control-mismatch / table-mismatch) + ephemeral `canvas_check_drift` tool (#148)
+- [ ] Slice C — CLI: `framesmith check-drift` / `framesmith verify` subcommands with CI-friendly exit codes (#148, #149)
+- [ ] Slice D — agent surfaces: drift-check-before-designing workflow in INSTRUCTIONS/GOTCHAS/GUIDELINES/README + discoverability guards
+
+_Full spec-driven breakdown in [`docs/specs/PHASE-23-SPEC.md`](docs/specs/PHASE-23-SPEC.md)._
+
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
