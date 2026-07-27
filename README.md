@@ -40,7 +40,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
 | **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` drift detection |
 | **Viewer** | Browser gallery + detail view · quality inspector (score, issues, click-to-highlight) · design-system token panel · point-and-tell feedback (Comment mode + Feedback tab) |
-| **Open by design** | MIT · plain HTML/CSS · open JSON you own in your repo · works with any MCP-compatible client |
+| **Open by design** | MIT · plain HTML/CSS · open JSON you own in your repo · content-hash versioning (`canvas_version`) so approvals reference an exact design, not just a name · works with any MCP-compatible client |
 
 ## Viewer
 
@@ -177,7 +177,7 @@ List canvases. Excludes archived canvases by default. A row carrying `openFeedba
 | `projectId` | string? | Scope to one project |
 | `includeArchived` | bool? | Include archived canvases (default false) |
 
-Returns `[{ id, name, createdAt, lastModified, projectId, archived, openFeedback? }]` — `openFeedback` (a count) is present only when > 0.
+Returns `[{ id, name, createdAt, lastModified, versionHash, projectId, archived, openFeedback? }]` — `openFeedback` (a count) is present only when > 0; `versionHash` is the design-content hash `canvas_version` checks approvals against.
 
 ### `canvas_move` / `canvas_archive` / `canvas_unarchive` / `canvas_delete`
 
@@ -440,6 +440,8 @@ Export a canvas or specific nodes to files on disk.
 | `height` | number? | Viewport height (default 900) |
 | `scale` | number? | Device scale (default 2) |
 
+Returns `{ exported: string[], versionHash }` — the exported file paths plus the canvas's design-content hash at export time (see `canvas_version`), so an exported artifact can be tied back to the exact design that produced it.
+
 ### `list_presets`
 
 List available style guide presets. No params. Returns preset names and descriptions.
@@ -548,6 +550,17 @@ Drift detection — the design-of-record as a **living contract**. Re-imports a 
 Returns the diff image (changed regions in red), `changePercent`, `changedPixels`/`totalPixels`, and the import report. Both sides render at scale 1, so the percentage is comparable run-to-run — an unchanged page diffs at ~0%.
 
 **CI pattern** (a pattern, not a shipped feature): after deploy, call `canvas_sync_from_url` for each route ↔ canvas pair and fail the job when `changePercent` exceeds your threshold — design ↔ code divergence becomes a build failure instead of a surprise.
+
+### `canvas_version`
+
+The falsifiable half of a design-approval gate: a stable **content hash** of the design itself (`sha256:<16 hex>` over the node tree, canvas tokens, components, and fonts). Metadata never moves it — feedback arriving or being resolved, critique stamps, and provenance changes all leave the hash unchanged — so an approval recorded against a hash survives everything except an actual design change. The hash is process- and machine-independent: the same checked-in repo canvas hashes identically everywhere.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `canvasId` | string | Canvas to hash |
+| `expectedHash` | string? | A previously recorded `versionHash` — the result gains `matches: true/false` |
+
+Returns `{ canvasId, name, versionHash, lastModified, matches? }`. Record `{ canvasId, versionHash }` wherever your approvals live (a YAML file, a PR comment — the workflow is yours); check it later with `expectedHash`. `canvas_list` rows and `export` results carry the same `versionHash`.
 
 ### `import_design_md`
 
