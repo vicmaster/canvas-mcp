@@ -161,7 +161,39 @@ Practical notes:
 - **A bare Tailwind snippet has no Tailwind runtime.** The intent mapper covers the common utilities + the bundled v4 palette; pass the compiled stylesheet via `css` for everything else. Live URLs always have real CSS, so this only matters for pasted snippets.
 - **Token snapping defaults to the target project's merged design system** — import into the right project and `tokenMatch` needs no configuration. Pass `tailwind: { theme }` to map custom utility names.
 - **Auth for gated pages** (`auth.headers`/`cookies`) lives in a throwaway browser context and is never persisted.
-- After importing: `screenshot` to review fidelity, fix what the report flagged, then the canvas is the design-of-record — wire `canvas_sync_from_url` into your workflow to keep it honest.
+- After importing: `screenshot` to review fidelity, fix what the report flagged, then the canvas is the design-of-record — the next section is how it stays one.
+
+## Keeping the design honest (gate integrity)
+
+A canvas that describes a shipped screen is a **contract**, and contracts rot silently: the code evolves, nobody re-compares, and one day the canvas shows a column that no longer exists or a radio group that shipped as a select. If approved canvases can silently stop describing reality, "approved" stops meaning anything. Three tools keep the contract falsifiable — split by the question they answer:
+
+| Question | Tool |
+|---|---|
+| *What* structurally diverged? | `canvas_check_drift` — findings in words: `missing-in-page`, `missing-in-canvas`, `control-mismatch`, `table-mismatch` |
+| *How much* does it look different? | `canvas_sync_from_url` — pixel diff + `changePercent` |
+| Is a recorded approval still true? | `canvas_version` — content `versionHash` + `expectedHash` check |
+
+**Before designing on an existing canvas that describes a shipped view, run `canvas_check_drift` against the live route.** Designing on a drifted canvas means faithfully restyling a fiction. On findings, reconcile **deliberately** — one of three moves, never a fourth:
+
+1. **The page is right** → update the canvas (`batch_design`, or re-import the changed region with `canvas_import_url`).
+2. **The canvas is right** → flag the implementation gap to the user; don't "fix" the canvas to match a bug.
+3. **Unclear which** → surface the difference and ask.
+
+Never silently annotate the difference away — that's how a select shipped against an approved radio group and the approval stayed green.
+
+**Approvals bind to a hash, not a name.** Record `{ canvasId, versionHash }` (from `canvas_version` or any `canvas_list` row) wherever your approval records live — a YAML file, a PR comment; the workflow is yours. The hash covers design content only (tree + tokens + components + fonts), so feedback arriving, critique stamps, and provenance changes never invalidate an approval — only an actual design change does. Check later with `expectedHash`, or headlessly from a hook:
+
+```bash
+npx framesmith verify kpi-revenue-driver-control --hash sha256:8014d416f924378b --project-dir .
+```
+
+**Make CI demand the comparison** — drift that waits for a human to notice is drift that ships. A post-deploy job per route ↔ canvas pair:
+
+```bash
+npx framesmith check-drift admin-stream-types --url "$STAGING_URL/admin/stream_types" --project-dir . --json
+```
+
+Exit codes are gate-friendly for both commands: `0` pass, `1` drift/mismatch, `2` error. `verify` is Chrome-free (pre-commit fast); `check-drift` needs Chrome and takes `--viewport WxH` / `--selector` / `--wait-for` for JS-rendered pages. Gated pages (auth) stay on the MCP tool — credentials don't belong in shell history.
 
 ## After designing
 
@@ -234,5 +266,5 @@ A few operational details that aren't obvious from the tool schemas:
 - **Prefer the structured form for gradients & shadows.** `gradient: { type, angle?, stops: [...] }` and `shadows: [{ x, y, blur, spread?, color, inset? }]`. A raw CSS string is accepted too, but the structured form is canonical and diffs cleanly.
 - **`shadows` (plural) always beats `shadow` (singular).** Writing `shadow` on a node that already has `shadows` does nothing at render time — the plural form wins. `batch_design` and `replace_matching_properties` flag this with a `warning` in the op result; when you see it, put the value in `shadows` (array or CSS string) or clear `shadows` first.
 - **`import_design_md` is best-effort.** It reads tokens per heading section in list / table / `name: value` form (see the tool description for the exact accepted schema) and silently skips what it can't parse — colors deliberately reject shadow/gradient strings. Set anything it misses with `set_variables`. It honors explicit named spacing values and only synthesizes a scale from a stated `Base unit:` — it won't fabricate one otherwise.
-- **Approvals should record a `versionHash`, not just a canvas name.** A name says which design was approved; the hash says which *version* of it. `canvas_version` returns a stable content hash of the design (tree + canvas tokens + components + fonts — metadata like feedback and critique stamps never moves it); `canvas_list` rows carry the same field. Record `{ canvasId, versionHash }` in the approval record, and pass it back as `expectedHash` later — `matches: false` means the approved canvas is no longer the current design. Outside an MCP client (CI, a pre-commit hook), `npx framesmith verify <canvasIdOrName> --hash <hash>` runs the same check headlessly and exits nonzero on mismatch.
+- **Approvals should record a `versionHash`, not just a canvas name.** A name says which design was approved; the hash says which *version* of it — see "Keeping the design honest (gate integrity)" above for the full workflow, `canvas_version` shape, and CLI recipes.
 - **`apply_preset` respects an inherited design system.** It won't overwrite tokens a canvas resolves through the workspace/project layers; those are reported as `preservedFromDesignSystem`. Pass them explicitly via `set_variables` if you actually want the preset's values.
