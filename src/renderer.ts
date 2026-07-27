@@ -443,7 +443,10 @@ function renderNode(node: SceneNode, canvas?: Canvas, registered?: ReadonlySet<s
   return `<div${dataAttr}${styleAttr}>${renderChildren(node, canvas, registered)}</div>`;
 }
 
-function resolveInstance(instance: SceneNode, canvas: Canvas): SceneNode | null {
+// Exported for drift.ts (Phase 23 slice B): the structural inventory must see
+// through instances — an app shell stamped as a component still has controls
+// and text the shipped page either has or hasn't.
+export function resolveInstance(instance: SceneNode, canvas: Canvas): SceneNode | null {
   const component = canvas.components[instance.componentId!];
   if (!component) return null;
 

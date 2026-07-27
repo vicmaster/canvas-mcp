@@ -23,6 +23,7 @@ import { listStructures, applyStructure, computeDiversificationHint } from './st
 import { parseDesignMd } from './design-md-parser.js';
 import { listFeedback, resolveFeedback, openFeedbackCount, appendFeedbackDirective } from './feedback.js';
 import { importHtml, importUrl, renderImportedTree, snapToTokens } from './import.js';
+import { computeStructuralDrift, expandInstances } from './drift.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
 import { evaluateCanvas } from './evaluate.js';
 import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
@@ -1377,6 +1378,57 @@ The design-of-record becomes a living contract: run this after deploys, or wire 
           }, null, 2) },
           ...fontWarningContent(fontWarnings),
         ],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  }
+);
+
+// --- canvas_check_drift (Phase 23 slice B, #148) ---
+server.tool(
+  'canvas_check_drift',
+  `Structural drift detection: re-import a live page EPHEMERALLY (no canvas created, nothing mutated) and compare WHAT the canvas and the shipped view are made of — where canvas_sync_from_url answers "how much does it LOOK different" (a pixel percentage), this answers "what diverged", in words. Coarse by design: it compares text runs, controls, and table shapes — never styles or geometry.
+
+Finding kinds: missing-in-page (the canvas shows something the page doesn't have — a phantom column, a control that was never built), missing-in-canvas (the page grew something the canvas doesn't show), control-mismatch (e.g. the canvas has a radio group ("Notification type"); the page has a select), table-mismatch (column/header divergence; row-count differences are info-only — data length isn't drift). Mostly-numeric texts are treated as data, not structure, so live figures don't false-flag; unmatched page text is a count, never per-string noise. inSync is true only when there are zero error/warning findings.
+
+Run this when PICKING UP a canvas that describes a shipped view — designing on a drifted canvas means faithfully restyling a fiction. On findings, reconcile DELIBERATELY: update the canvas (batch_design / canvas_import_url), fix the implementation, or flag the difference to the user — never silently annotate it away. The result carries the canvas's versionHash so a gate can record what was checked. Same live-page controls as canvas_import_url (viewport / selector / waitFor / auth — auth stays in a throwaway context, never persisted).`,
+  {
+    canvasId: z.string().describe('The canvas that is the design-of-record'),
+    url: z.string().regex(/^https?:\/\//i).describe('The live page to compare against (http/https)'),
+    viewport: z.object({
+      width: z.number().optional().describe('Import width (default: the canvas root width, else 1440)'),
+      height: z.number().optional().describe('Import height (default: the canvas root height, else 900)'),
+    }).optional(),
+    selector: z.string().optional().describe('Compare against one component instead of the whole page'),
+    waitFor: z.union([z.string(), z.number()]).optional().describe('CSS selector to await, or delay in ms — for JS-rendered pages'),
+    auth: z.object({
+      headers: z.record(z.string()).optional(),
+      cookies: z.array(z.object({ name: z.string(), value: z.string(), domain: z.string().optional(), path: z.string().optional() })).optional(),
+    }).optional().describe('Credentials for gated pages — throwaway context, never persisted'),
+  },
+  async ({ canvasId, url, viewport, selector, waitFor, auth }) => {
+    ensureFresh(canvasId); // compare what's on disk, not a stale in-memory copy
+    const canvas = getCanvas(canvasId);
+    if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
+
+    try {
+      const w = viewport?.width ?? (typeof canvas.root.width === 'number' ? canvas.root.width : 1440);
+      const h = viewport?.height ?? (typeof canvas.root.height === 'number' ? canvas.root.height : 900);
+
+      const imported = await importUrl(url, { viewport: { width: w, height: h }, selector, waitFor, auth });
+      // Instance-expanded so stamped components (app shells) are inventoried.
+      const drift = computeStructuralDrift(expandInstances(canvas.root, canvas), imported.root);
+
+      const blocking = drift.findings.filter((f) => f.severity !== 'info').length;
+      return {
+        content: [{ type: 'text', text: JSON.stringify({
+          ...drift,
+          versionHash: canvasVersionHash(canvas),
+          verdict: drift.inSync
+            ? 'IN SYNC — no structural drift between the canvas and the page.'
+            : `DRIFTED — ${blocking} structural finding(s). Reconcile deliberately: update the canvas, fix the implementation, or flag the difference — do not design on this canvas as-is.`,
+        }, null, 2) }],
       };
     } catch (err) {
       return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };

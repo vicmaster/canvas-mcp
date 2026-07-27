@@ -38,7 +38,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 | **Quality & taste** | `canvas_evaluate` (6 categories + cliché tells) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` |
 | **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
-| **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` drift detection |
+| **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift |
 | **Viewer** | Browser gallery + detail view · quality inspector (score, issues, click-to-highlight) · design-system token panel · point-and-tell feedback (Comment mode + Feedback tab) |
 | **Open by design** | MIT · plain HTML/CSS · open JSON you own in your repo · content-hash versioning (`canvas_version`) so approvals reference an exact design, not just a name · works with any MCP-compatible client |
 
@@ -551,6 +551,23 @@ Returns the diff image (changed regions in red), `changePercent`, `changedPixels
 
 **CI pattern** (a pattern, not a shipped feature): after deploy, call `canvas_sync_from_url` for each route ↔ canvas pair and fail the job when `changePercent` exceeds your threshold — design ↔ code divergence becomes a build failure instead of a surprise.
 
+Pixel-level only — it tells you *how much* changed, not *what*. For that, see `canvas_check_drift` below.
+
+### `canvas_check_drift`
+
+Structural drift detection — where `canvas_sync_from_url` answers *"how much does it **look** different"* (a pixel percentage), this answers *"**what** diverged"*, in words. Re-imports the live page ephemerally (no canvas created, nothing mutated) and compares normalized inventories of both trees — text runs, controls, table shapes; never styles or geometry:
+
+| Finding kind | Meaning |
+|---|---|
+| `missing-in-page` | The canvas shows something the page doesn't have — a phantom column, a control that was never built |
+| `missing-in-canvas` | The page grew something the canvas doesn't show |
+| `control-mismatch` | e.g. *the canvas has a radio group ("Notification type"); the page has a select* |
+| `table-mismatch` | Column/header divergence (row-count differences are info-only — data length isn't drift) |
+
+Mostly-numeric texts are treated as data, not structure, so live figures don't false-flag; unmatched page text is reported as a count, never per-string noise. Takes the same params as `canvas_sync_from_url` (`canvasId`, `url`, `viewport`, `selector`, `waitFor`, `auth`). Returns `{ inSync, findings, counts, versionHash, verdict }` — `inSync` is true only with zero error/warning findings.
+
+Run it when picking up a canvas that describes a shipped view — designing on a drifted canvas means faithfully restyling a fiction. On findings, reconcile deliberately: update the canvas, fix the implementation, or flag the difference — never silently annotate it away.
+
 ### `canvas_version`
 
 The falsifiable half of a design-approval gate: a stable **content hash** of the design itself (`sha256:<16 hex>` over the node tree, canvas tokens, components, and fonts). Metadata never moves it — feedback arriving or being resolved, critique stamps, and provenance changes all leave the hash unchanged — so an approval recorded against a hash survives everything except an actual design change. The hash is process- and machine-independent: the same checked-in repo canvas hashes identically everywhere.
@@ -1009,7 +1026,7 @@ The loop framesmith is built around — start from taste, adapt, and polish to t
 5. Watch the viewer auto-refresh as you design; `screenshot` to check the render.
 6. **`canvas_evaluate`** → read the `directive`. Resolve every warning and cliché tell (`canvas_autofix` for the mechanical subset, `batch_design` for the rest), then re-evaluate. Repeat until it says `READY` — only then present the design.
 7. `screenshot_responsive` → confirm it holds at mobile / tablet / desktop.
-8. `canvas_diff` / `canvas_sync_from_url` → compare versions, or check the shipped app hasn't drifted from the approved design.
+8. `canvas_diff` / `canvas_sync_from_url` / `canvas_check_drift` → compare versions, or check the shipped app hasn't drifted from the approved design — pixel-level or structural.
 9. `export` → save final designs to PNG/PDF.
 
 ## Development
