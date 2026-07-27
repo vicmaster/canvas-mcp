@@ -9,6 +9,24 @@ interface OperationResult {
    * counting result positions. Only set by node-creating ops (I / C / R). */
   binding?: string;
   error?: string;
+  /** The op succeeded but part of it will not take effect (e.g. a `shadow`
+   * written to a node whose `shadows` wins at render time). Issue #151: a
+   * silently ignored property costs an agent a debugging cycle — say so. */
+  warning?: string;
+}
+
+/** The renderer gives `shadows` (array or CSS string) total precedence over the
+ * singular `shadow` — see boxShadowCss in renderer.ts. When an op writes
+ * `shadow` onto a node where `shadows` is active, the value is a silent no-op;
+ * return the warning the result should carry (issue #151). */
+export function ignoredShadowWarning(node: SceneNode, props: Record<string, unknown>): string | undefined {
+  if (!('shadow' in props)) return undefined;
+  const plural = node.shadows;
+  const pluralActive = Array.isArray(plural)
+    ? plural.length > 0
+    : typeof plural === 'string' && (plural as string).trim().length > 0;
+  if (!pluralActive) return undefined;
+  return '`shadow` was ignored: this node also has `shadows`, which always wins at render time. Put the value in `shadows` (array or CSS string), or clear `shadows` first.';
 }
 
 export function parseAndExecute(root: SceneNode, operationsStr: string, canvas?: Canvas): OperationResult[] {
@@ -213,7 +231,7 @@ function executeLine(root: SceneNode, line: string, bindings: Map<string, string
         canvas.components[node.id] = node;
       }
       if (bindingName) bindings.set(bindingName, node.id);
-      return { ok: true, nodeId: node.id, ...(bindingName ? { binding: bindingName } : {}) };
+      return withWarning({ ok: true, nodeId: node.id, ...(bindingName ? { binding: bindingName } : {}) }, node, props);
     }
 
     case 'U': {
@@ -221,7 +239,7 @@ function executeLine(root: SceneNode, line: string, bindings: Map<string, string
       const nodeId = resolveId(args[0], bindings);
       const props = args.length > 1 ? parseJsonArg(args.slice(1).join(',')) : {};
       const node = updateNode(root, nodeId, props as Partial<SceneNode>);
-      return { ok: true, nodeId: node.id };
+      return withWarning({ ok: true, nodeId: node.id }, node, props);
     }
 
     case 'D': {
@@ -238,7 +256,7 @@ function executeLine(root: SceneNode, line: string, bindings: Map<string, string
       const overrides = args.length > 2 ? parseJsonArg(args.slice(2).join(',')) : undefined;
       const node = copyNode(root, sourceId, parentId, overrides as Partial<SceneNode> | undefined);
       if (bindingName) bindings.set(bindingName, node.id);
-      return { ok: true, nodeId: node.id, ...(bindingName ? { binding: bindingName } : {}) };
+      return withWarning({ ok: true, nodeId: node.id, ...(bindingName ? { binding: bindingName } : {}) }, node, overrides ?? {});
     }
 
     case 'M': {
@@ -256,10 +274,16 @@ function executeLine(root: SceneNode, line: string, bindings: Map<string, string
       const props = args.length > 1 ? parseJsonArg(args.slice(1).join(',')) : {};
       const node = replaceNode(root, nodeId, props as Partial<SceneNode>);
       if (bindingName) bindings.set(bindingName, node.id);
-      return { ok: true, nodeId: node.id, ...(bindingName ? { binding: bindingName } : {}) };
+      return withWarning({ ok: true, nodeId: node.id, ...(bindingName ? { binding: bindingName } : {}) }, node, props);
     }
 
     default:
       throw new Error(`Unknown operation: ${op}`);
   }
+}
+
+/** Attach the ignored-`shadow` warning to a successful result when it applies. */
+function withWarning(result: OperationResult, node: SceneNode, props: Record<string, unknown>): OperationResult {
+  const warning = ignoredShadowWarning(node, props);
+  return warning ? { ...result, warning } : result;
 }
