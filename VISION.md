@@ -472,6 +472,7 @@ _Full spec-driven breakdown in [`docs/specs/PHASE-23-SPEC.md`](docs/specs/PHASE-
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
+- [x] `canvas_set_genre` — stamp (or clear) `metadata.provenance.preset` directly, without `apply_preset`'s token/component churn, so an already-styled canvas can be calibrated for cliché-tell relaxation in one call; never moves `versionHash` (issue #162)
 
 ---
 

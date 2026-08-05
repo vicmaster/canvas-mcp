@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { createCanvas, getCanvas, listCanvases, findNode, touchCanvas, loadPersistedCanvases, archiveCanvas, unarchiveCanvas, moveCanvas, deleteCanvas, countCanvasesInProject, ensureFresh, collectMatchingNodes, replaceMatchingProperties, findNodesDetailed } from './scene-graph.js';
+import { createCanvas, getCanvas, listCanvases, findNode, touchCanvas, loadPersistedCanvases, archiveCanvas, unarchiveCanvas, moveCanvas, deleteCanvas, countCanvasesInProject, ensureFresh, collectMatchingNodes, replaceMatchingProperties, findNodesDetailed, setCanvasGenre } from './scene-graph.js';
 import { canvasVersionHash } from './version.js';
 import { loadPersistedWorkspaces, ensureDefaultWorkspaceAndProject, createWorkspace, listWorkspaces, renameWorkspace, deleteWorkspace, createProject, getProject, getWorkspace, listProjects, renameProject, deleteProject, setWorkspaceDesignSystem, getWorkspaceDesignSystem, setProjectDesignSystem, getProjectDesignSystem, getCanvasTokens, getInheritedTokens, loadRepoWorkspace } from './workspaces.js';
 import { DEFAULT_PROJECT_ID, DEFAULT_WORKSPACE_ID } from './types.js';
@@ -25,7 +25,7 @@ import { listFeedback, resolveFeedback, openFeedbackCount, appendFeedbackDirecti
 import { importHtml, importUrl, renderImportedTree, snapToTokens } from './import.js';
 import { computeStructuralDrift, expandInstances } from './drift.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
-import { evaluateCanvas } from './evaluate.js';
+import { evaluateCanvas, relaxedByGenre, knownGenres } from './evaluate.js';
 import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
 import { reviseCanvas } from './reviser.js';
 import { stampCritique, runReviseLoop } from './critique.js';
@@ -114,7 +114,7 @@ const GOTCHAS = [
   'Binding (canvas_bind, or init on first run) re-keys every project / canvas ID to repo-* form — use the IDs init returns, never cache pre-bind IDs.',
   'Point-and-tell feedback: the user clicks elements in the viewer (Comment mode) to leave node-anchored or whole-page comments, stored on the canvas at metadata.feedback. get_feedback returns them (with a node snapshot; orphaned: true = the node is gone but the concern likely still applies); open feedback blocks presenting, same as open inspector comments — address each item, then resolve_feedback with a one-line note of what changed (shown as your reply in the viewer\'s Feedback tab). canvas_list rows and canvas_evaluate results carry an openFeedback count (and the evaluate directive stays blocking) while comments are open.',
   'Cliché tells (canvas_evaluate "cliche" category): avoid default purple/indigo accents, gradient/glow overuse, fake window chrome, fabricated metrics, slop copy (filler verbs / scroll cues / "Jane Doe" / hype labels), an eyebrow above every section (keep to ~1 per 3 sections), mixed radius systems (one radius scale), pure black/white (use off-black/off-white), and competing accents (one accent hue + neutrals).',
-  'Genre calibration: declare the genre the screen actually IS — genre: "dashboard" (alias "data") on canvas_evaluate/canvas_autofix stops a data-dense screen\'s own realistic figures from flagging as fabricated; "material" allows purple + white surfaces. Genre follows what the screen is FOR, not what it contains: read screens with published figures → "dashboard"; editors/admin forms → "material". The evaluate result\'s genre field audits the choice ({ active, source, relaxed, notRelaxed }) — a score pinned by tells in notRelaxed means the genre is probably wrong. Matching an existing app\'s type scale? Declare the sizes as typography tokens — pinned sizes skip the adjacent-ratio check. Never use genre to dodge flags on a marketing page.',
+  'Genre calibration: declare the genre the screen actually IS — stamp it durably with canvas_set_genre (no token churn; null clears), or pass genre: "dashboard" (alias "data") per call on canvas_evaluate/canvas_autofix. "dashboard" stops a data-dense screen\'s own realistic figures from flagging as fabricated; "material" allows purple + white surfaces. Genre follows what the screen is FOR, not what it contains: read screens with published figures → "dashboard"; editors/admin forms → "material". The evaluate result\'s genre field audits the choice ({ active, source, relaxed, notRelaxed }) — a score pinned by tells in notRelaxed means the genre is probably wrong. Matching an existing app\'s type scale? Declare the sizes as typography tokens — pinned sizes skip the adjacent-ratio check. Never use genre to dodge flags on a marketing page.',
   'Gate integrity: a canvas describing a SHIPPED view is a contract — run canvas_check_drift against the live route BEFORE designing on it (findings: missing-in-page / missing-in-canvas / control-mismatch / table-mismatch), and reconcile deliberately: update the canvas, flag the implementation, or ask — never silently annotate a difference. canvas_sync_from_url answers "how much does it LOOK different" (pixel %); canvas_version makes approvals falsifiable — record { canvasId, versionHash } at approval time and check with expectedHash later (metadata/feedback never moves the hash). CI can demand both: npx framesmith check-drift / verify exit 1 on failure.',
 ];
 
@@ -1569,6 +1569,36 @@ server.tool(
   }
 );
 
+// --- canvas_set_genre (issue #162) ---
+server.tool(
+  'canvas_set_genre',
+  `Durably declare what a canvas IS — writes the genre to metadata.provenance.preset WITHOUT the token/component churn of apply_preset, so an already-styled canvas can be calibrated in one call. The stamp is what canvas_evaluate / canvas_autofix / the viewer's quality panel read when no explicit genre param is passed (the evaluate result's genre.source shows "provenance" for a stamp vs "explicit" for a param). Pass genre: null to clear the stamp; other provenance facts (structure, importedFrom) are preserved either way.
+
+Genres that relax cliche tells: "material" (accent-hue, pure-black-white), "dashboard" / alias "data" (honest-content). Any other string is stored but relaxes nothing — the result's "relaxes" list (and a note) tells you immediately, instead of a silently ineffective stamp. Genre follows what the screen is FOR, not what it contains: read screens with published figures → "dashboard"; editors/admin forms → "material". NEVER use a genre to dodge flags on a marketing page — declaring the wrong genre doesn't make the design better, it makes the evaluator blind.
+
+Stamping a genre does NOT move the canvas's versionHash (the hash covers design content only, never metadata) — recorded approvals stay valid.`,
+  {
+    canvasId: z.string().describe('Canvas ID'),
+    genre: z.string().nullable().describe('Genre to stamp (e.g. "dashboard", "material"), or null to clear the stamp'),
+  },
+  async ({ canvasId, genre }) => {
+    const result = setCanvasGenre(canvasId, genre);
+    if (!result) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
+    const relaxes = genre === null ? [] : relaxedByGenre(genre);
+    const unknown = genre !== null && relaxes.length === 0;
+    return {
+      content: [{ type: 'text', text: JSON.stringify({
+        canvasId,
+        genre,
+        previous: result.previous,
+        relaxes,
+        ...(unknown ? { note: `"${genre}" is not a known relax-genre — it will relax no cliche tells (known: ${knownGenres().join(', ')}). The stamp is stored anyway (preset names are legal here).` } : {}),
+        versionHashUnchanged: true,
+      }, null, 2) }],
+    };
+  }
+);
+
 // --- canvas_evaluate ---
 server.tool(
   'canvas_evaluate',
@@ -1588,7 +1618,7 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
       .optional()
       .describe('Specific categories to evaluate (default: all)'),
     genre: z.string().optional()
-      .describe('Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens (relaxes honest-content). Defaults to the canvas provenance preset if stamped. Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; editors and admin forms are "material". The result\'s genre field shows what the choice did.'),
+      .describe('Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens (relaxes honest-content). Defaults to the canvas provenance preset if stamped (canvas_set_genre stamps it durably, no token churn). Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; editors and admin forms are "material". The result\'s genre field shows what the choice did.'),
     floor: z.number().min(1).max(5).optional()
       .describe('llm mode only: per-axis rubric floor (1-5). Any axis below it sets needsRevision. Default 3 (or FRAMESMITH_CRITIQUE_FLOOR).'),
   },
@@ -1652,7 +1682,7 @@ server.tool(
       .optional()
       .describe('Restrict to fixes from these categories (default: all)'),
     genre: z.string().optional()
-      .describe('Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens (relaxes honest-content). Defaults to the canvas provenance preset if stamped. Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; editors and admin forms are "material". The result\'s genre field shows what the choice did.'),
+      .describe('Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens (relaxes honest-content). Defaults to the canvas provenance preset if stamped (canvas_set_genre stamps it durably, no token churn). Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; editors and admin forms are "material". The result\'s genre field shows what the choice did.'),
     apply: z.boolean().optional()
       .describe('Write the fixes to the canvas in this call (default false: propose only, returning ops to run via batch_design).'),
   },
