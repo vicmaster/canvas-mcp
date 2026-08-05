@@ -651,6 +651,17 @@ Comments are authored in the viewer: toggle **Comment** in the detail-page toolb
 
 `get_feedback` with `canvasId` returns `{ canvasId, openCount, entries }`; omitted, it sweeps and returns `{ canvasesWithFeedback, canvases: [{ canvasId, name, openCount, entries }] }` (only canvases that have feedback). `resolve_feedback` returns `{ resolved: string[], notFound: string[], openCount }` — unknown or already-resolved ids land in `notFound` instead of throwing.
 
+### `canvas_set_genre`
+
+Durably declare what a canvas *is* — writes the evaluation genre to `metadata.provenance.preset` without the token/component churn of `apply_preset`, so an already-styled canvas can be calibrated in one call. The stamp is what `canvas_evaluate` / `canvas_autofix` / the viewer's quality panel read when no explicit `genre` param is passed.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `canvasId` | string | Canvas to stamp |
+| `genre` | string \| null | Genre to stamp (`"dashboard"`, `"material"`, …) — `null` clears the stamp |
+
+Returns `{ canvasId, genre, previous, relaxes, note?, versionHashUnchanged }` — `relaxes` lists the cliché tells the stamp relaxes; an unknown genre is stored but relaxes nothing, and the `note` says so immediately. Other provenance facts (structure, `importedFrom`) are preserved, and the stamp never moves the canvas's `versionHash` (the hash covers design content only) — recorded approvals stay valid.
+
 ### `canvas_evaluate`
 
 Auto-score a design against quality heuristics. Returns an overall score (0–100), per-category scores, per-node actionable issues, and a **`directive`** — a present/keep-working verdict. Designed for generator-evaluator loops: build with `batch_design`, score with `canvas_evaluate`, fix the issues targeting the returned `nodeId`s, repeat until the directive says `READY`.
@@ -666,7 +677,7 @@ Whenever the `cliche` category runs, the result also carries a **`genre`** field
 | `canvasId` | string | Canvas ID to evaluate |
 | `mode` | `"fast"` \| `"detailed"` \| `"llm"` | `"fast"` = JSON-tree analysis only (<100ms). `"detailed"` adds Puppeteer-based pixel-level overlap checks. `"llm"` runs fast-mode heuristics plus a vision-model critique (provider picked from `FRAMESMITH_LLM_PROVIDER` or whichever of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` is set — costs one paid API call per invocation). Default `"fast"`. |
 | `categories` | string[]? | Subset of `spacing`, `color`, `typography`, `structure`, `consistency`, `cliche`. Defaults to all. |
-| `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped. Pick by what the screen is *for* (read screens with published figures → `dashboard`; editors/admin forms → `material`), not what it contains — the result's `genre` field audits the choice. |
+| `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped (`canvas_set_genre` stamps it durably, no token churn). Pick by what the screen is *for* (read screens with published figures → `dashboard`; editors/admin forms → `material`), not what it contains — the result's `genre` field audits the choice. |
 
 **Categories and what they check**
 
@@ -749,7 +760,7 @@ Runs `canvas_evaluate` in fast mode and returns just the subset of issues with a
 |-------|------|-------------|
 | `canvasId` | string | Canvas to autofix |
 | `categories` | string[]? | Restrict to fixes from these categories (default: all) |
-| `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped. |
+| `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped (`canvas_set_genre` stamps it durably, no token churn). |
 | `apply` | bool? | Write the fixes to the canvas in this call (default `false`: propose only) |
 
 **What gets auto-fixed**

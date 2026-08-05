@@ -164,6 +164,29 @@ export function getCanvas(id: string): Canvas | undefined {
   return store.get(id);
 }
 
+/** Issue #162 — stamp (or clear) the evaluation genre durably: writes
+ * metadata.provenance.preset WITHOUT touching tokens/components the way
+ * apply_preset does. `null` clears the stamp; other provenance facts
+ * (structure, importedFrom, …) are preserved either way. Returns the prior
+ * stamp, or undefined when the canvas doesn't exist. */
+export function setCanvasGenre(canvasId: string, genre: string | null): { previous: string | null } | undefined {
+  ensureFresh(canvasId); // stamp on top of what's on disk, not a stale copy
+  const canvas = store.get(canvasId);
+  if (!canvas) return undefined;
+  const prov: Partial<import('./types.js').Provenance> = { ...canvas.metadata?.provenance };
+  const previous = typeof prov.preset === 'string' ? prov.preset : null;
+  if (genre === null) {
+    if (previous === null) return { previous }; // nothing to clear — don't dirty the file
+    delete prov.preset;
+  } else {
+    prov.preset = genre;
+    prov.at = new Date().toISOString();
+  }
+  canvas.metadata = { ...canvas.metadata, provenance: prov as import('./types.js').Provenance };
+  touchCanvas(canvasId);
+  return { previous };
+}
+
 /**
  * Reload a canvas from disk if its file changed externally since this process
  * last touched it — so the caller mutates the current version instead of

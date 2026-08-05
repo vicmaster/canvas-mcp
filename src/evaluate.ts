@@ -681,6 +681,15 @@ const RELAXED_BY_GENRE: Record<string, ClicheTell[]> = {
   data: ['honest-content'],
 };
 
+/** Issue #162 — what a genre stamp buys, for canvas_set_genre's immediate
+ * feedback (the evaluate-time report stays buildGenreReport's job). */
+export function relaxedByGenre(genre: string): ClicheTell[] {
+  return RELAXED_BY_GENRE[genre] ?? [];
+}
+export function knownGenres(): string[] {
+  return Object.keys(RELAXED_BY_GENRE);
+}
+
 /** Issue #152 — make the genre decision visible in the evaluate result: which
  * genre ran, where it came from, what it relaxed, and which tells a DIFFERENT
  * genre would have relaxed (the tradeoff that's otherwise only discoverable by
