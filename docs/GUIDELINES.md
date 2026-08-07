@@ -237,6 +237,26 @@ The happy path of one static frame with ideal data is half a design. Real UX liv
 
 **Then stress it.** `canvas_stress` re-renders the canvas under hostile-but-realistic content — `long-text` (×2.2 + an unbroken German compound), `i18n` (×1.4), `big-numbers` (`9` → `999+`, `$1.5M` → `$1,520,847.33`), `empty`, `many` (rows ×3) — and reports what broke, by node id: `clip` (info when a designed ellipsis is doing its job), `overflow-x`, `layout-shift` (untouched nodes only). Only *new* breakage counts. Fix findings with the [width strategies](#width-strategies) above — fluid widths, `minWidth` floors, wrapping — and re-run until `CLEAN`. A data screen goes to the user with its states designed and a `CLEAN` stress verdict, the same way it goes with a >95 score.
 
+## Reviewing the set
+
+A product is a set of screens, and two whole classes of quality only exist at that level. When a multi-screen module feels done, review it as one:
+
+**`project_evaluate({ projectId })`** rolls up per-screen scores (with designed/missing states and token adoption) plus the cross-screen findings no single canvas can see:
+
+| Finding | What it means | The fix path |
+|---|---|---|
+| `radius-drift` | One screen runs a different corner-radius system than the rest | Align to the shared scale, or declare radius tokens |
+| `accent-drift` | One screen's accent hue sits far from the project's dominant one | Point it at the shared `$accent` (or `generate_color_system` once at the workspace) |
+| `token-adoption` | One screen styles by hand while the rest reference tokens | The consistency lint lists the exact literals; `canvas_autofix` re-attaches unique matches |
+| `copied-chrome` | The same shell hand-copied across screens instead of component instances | `create_component` on one, stamp instances, `copy_nodes` to siblings |
+| `state-coverage` | The aggregated missing empty/loading/error table | `canvas_add_variant` + the state scaffolds, one screen at a time |
+
+**This roll-up is advisory — it never gates.** Only the per-canvas directives (score, coverage, feedback) block presenting; the roll-up reviews coherence and names its evidence (which canvases, which values) so a human can overrule any finding at a glance.
+
+**`mode: "llm"` adds the flow critique**: up to 8 screens rendered and judged *together* against four flow axes — navigation-consistency, terminology-consistency, state-visibility, hierarchy-consistency — with per-screen notes naming the canvas. Screens past the cap land in `flowSkipped` (pass `canvasIds` to pick the flow); without an API key the full heuristic roll-up still returns with a `flowNote`. One paid multi-image call per invocation, same cost posture as `canvas_evaluate`'s llm mode.
+
+The rhythm for a module: design each screen to its own READY directive → design the states → stress the data screens → then `project_evaluate` before calling the set done.
+
 ## Designing with taste
 
 The bar is "designers say *wow*," not "competent." The cliché tells below are the *don'ts*; these are the *do's*. Apply them up front — the evaluator is the safety net, not the plan.
