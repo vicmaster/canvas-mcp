@@ -36,7 +36,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 | **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar, multi-series) |
 | **Pattern library** | 11 vetted page archetypes + 5 component scaffolds, all scoring > 95 with zero cliché tells; taxonomy axes + a diversification signal so successive screens vary |
 | **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` · `canvas_add_variant` clones a screen into a linked empty/loading/error state · `canvas_stress` content-perturbation testing (long text, i18n, big numbers, empty/many rows) |
-| **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import · `generate_scale` derives a modular type + spacing scale from a named ratio (optional fluid `clamp()` sizes) · `generate_color_system` turns one seed color into OKLCH ramps + AA-checked semantic tokens |
+| **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import · `generate_scale` derives a modular type + spacing scale from a named ratio (optional fluid `clamp()` sizes) · `generate_color_system` turns one seed color into OKLCH ramps + AA-checked semantic tokens, dark theme included · dual-theme rendering + evaluation (`theme: "dark"` on screenshot/export, both-theme contrast in `canvas_evaluate` with APCA advisory) |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
 | **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift · `framesmith verify` / `check-drift` CLI for CI/pre-commit gates, no MCP client needed |
 | **Viewer** | Browser gallery + detail view · quality inspector (score, issues, click-to-highlight) · design-system token panel · point-and-tell feedback (Comment mode + Feedback tab) |
@@ -360,6 +360,7 @@ Render canvas to PNG (returned as base64 image).
 | `width` | number? | Viewport width (default 1440) |
 | `height` | number? | Viewport height (default 900) |
 | `scale` | number? | Device scale (default 2) |
+| `theme` | string? | `"dark"` renders the design system's dark token layer (`dark.colors` overrides); default light — a no-op without a dark layer |
 
 ### `read_nodes`
 
@@ -411,11 +412,11 @@ One seed color → a full perceptual color system, written to the workspace / pr
 | `seed` | string | The brand color everything derives from (`#RRGGBB`) |
 | `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
 
-The result also reports the **dark mapping** (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) — storage for it lands with the dual-theme slice. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
+The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
 
 ### `get_variables` / `set_variables`
 
-Read and write design tokens (colors, spacing, radius, typography). Use `$tokenName` in node properties to reference variables.
+Read and write design tokens (colors, spacing, radius, typography — plus a `dark` override layer). Use `$tokenName` in node properties to reference variables. The `dark` layer is SPARSE, keyed by token name: anything not overridden inherits the light value; it drives `theme: "dark"` renders and the dual-theme contrast check.
 
 ```json
 {
@@ -482,6 +483,7 @@ Export a canvas or specific nodes to files on disk.
 | `width` | number? | Viewport width (default 1440) |
 | `height` | number? | Viewport height (default 900) |
 | `scale` | number? | Device scale (default 2) |
+| `theme` | string? | `"dark"` renders the design system's dark token layer (`dark.colors` overrides); default light — a no-op without a dark layer |
 
 Returns `{ exported: string[], versionHash }` — the exported file paths plus the canvas's design-content hash at export time (see `canvas_version`), so an exported artifact can be tied back to the exact design that produced it.
 
@@ -666,6 +668,7 @@ The renderer emits `clamp()` for paddings ≥ 32px and font sizes ≥ 24px, so h
 | `canvasId` | string | Canvas ID |
 | `breakpoints` | array? | `[{label, width, height}]` — custom breakpoints |
 | `scale` | number? | Device scale (default 2) |
+| `theme` | string? | `"dark"` renders the design system's dark token layer (`dark.colors` overrides); default light — a no-op without a dark layer |
 
 ### `canvas_diff`
 
@@ -729,7 +732,7 @@ Whenever the `coverage` category runs on a **base** canvas, the result also carr
 | Category | Weight | Checks |
 |----------|--------|--------|
 | `spacing` | 20 | Off-scale padding/gap values, too many unique spacing values |
-| `color` | 25 | WCAG AA contrast ratios for text against nearest background |
+| `color` | 25 | WCAG AA contrast ratios for text against nearest background — checked in BOTH themes when a `dark` token layer exists (dark-run issues carry `theme: "dark"`, score takes the worse theme, and dark failures point at the dark layer instead of carrying a literal fix). WCAG-passing pairs that are perceptually weak by **APCA** get an info advisory (Lc vs ~75 body / ~60 large) — APCA is a candidate method, not a standard; it never blocks |
 | `typography` | 20 | Type-scale ratios (1.1–2.0; adjacent sizes both declared as typography tokens are pinned and skip the check), font-family count, weight variation — plus score-neutral craft advisories: measure (prose past ~75 characters per line; warning past 90), tracking (display text ≥28px without negative letter-spacing, autofixable), and tabular numerals (numeric table columns without `tabularNums`, autofixable) |
 | `structure` | 15 | Tree depth, naming coverage, design-token usage %, component reuse |
 | `consistency` | 20 | Frames missing `layout`, inconsistent sibling padding, sibling overlap (detailed mode) |

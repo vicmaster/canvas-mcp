@@ -203,6 +203,11 @@ export interface DesignVariables {
   spacing?: Record<string, number>;
   radius?: Record<string, number>;
   typography?: Record<string, { fontSize: number | string; fontWeight?: string | number; fontFamily?: string; lineHeight?: number | string; letterSpacing?: number }>;
+  /** Phase 25 slice D — the dark theme as a SPARSE override layer keyed by
+   * token NAME: anything not overridden inherits the light value. Rendering
+   * and evaluation merge it over `colors` when theme = "dark"; storage stays
+   * one flat, diffable object per layer. */
+  dark?: { colors?: Record<string, string> };
 }
 
 /** Custom font face declaration. Renderer emits a single `@font-face` rule

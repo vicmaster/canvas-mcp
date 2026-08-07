@@ -113,7 +113,9 @@ export async function startViewer(port: number): Promise<number> {
       if (htmlMatch) {
         const canvas = getCanvas(htmlMatch[1]);
         if (!canvas) { res.writeHead(404); res.end('Not found'); return; }
-        const resolved = resolveVariables(canvas.root, getCanvasTokens(canvas));
+        // Phase 25 slice D — ?theme=dark renders the dark token layer.
+        const theme = url.searchParams.get('theme') === 'dark' ? 'dark' as const : undefined;
+        const resolved = resolveVariables(canvas.root, getCanvasTokens(canvas), { theme });
         const defaultW = typeof canvas.root.width === 'number' ? canvas.root.width : 1440;
         const defaultH = typeof canvas.root.height === 'number' ? canvas.root.height : 900;
         const w = url.searchParams.has('w') ? parseInt(url.searchParams.get('w')!, 10) : defaultW;
@@ -1107,6 +1109,9 @@ export async function renderDetailPage(canvas: Canvas, port: number): Promise<st
     if (parts.length) provChip = `<span class="prov" title="Provenance — the structure / preset / axes that produced this canvas"><b>◆</b>${parts.join(' · ')}</span>`;
   }
 
+  // Phase 25 slice D — a dark token layer makes the theme toggle appear.
+  const hasDark = Object.keys(getCanvasTokens(canvas).dark?.colors ?? {}).length > 0;
+
   // State chips (Phase 24 slice A) — a screen and its designed states cross-
   // link: on a base with variants, "default" (active) + each state; on a
   // variant, the base ("default") + every sibling state. Orphan-safe: a
@@ -1329,6 +1334,7 @@ ${FAVICON_HTML}
     ${verdictChip}
     <div class="spacer"></div>
     <div class="toolbar-cluster">
+      ${hasDark ? '<button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Render the dark token layer">Dark</button>' : ''}
       <button class="btn" onclick="setViewport(390, 844)" id="bp-mobile">Mobile</button>
       <button class="btn" onclick="setViewport(768, 1024)" id="bp-tablet">Tablet</button>
       <button class="btn active" onclick="setViewport(${w}, ${h})" id="bp-desktop">Desktop</button>
@@ -1402,6 +1408,20 @@ ${FAVICON_HTML}
         document.getElementById('status').className = 'status stale';
       }
     }, 2000);
+
+    // Phase 25 slice D — flip every iframe between light and dark renders.
+    let themeMode = 'light';
+    function toggleTheme() {
+      themeMode = themeMode === 'light' ? 'dark' : 'light';
+      const btn = document.getElementById('theme-toggle');
+      if (btn) { btn.textContent = themeMode === 'light' ? 'Dark' : 'Light'; btn.classList.toggle('active', themeMode === 'dark'); }
+      document.querySelectorAll('iframe').forEach((frame) => {
+        const u = new URL(frame.src, location.href);
+        if (themeMode === 'dark') u.searchParams.set('theme', 'dark');
+        else u.searchParams.delete('theme');
+        frame.src = u.toString();
+      });
+    }
 
     function refreshFrames() {
       const t = Date.now();

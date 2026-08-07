@@ -1,7 +1,14 @@
 import type { Canvas, DesignVariables, SceneNode } from './types.js';
 
-export function resolveVariables(node: SceneNode, variables: DesignVariables): SceneNode {
-  return deepResolve(structuredClone(node), variables);
+export function resolveVariables(node: SceneNode, variables: DesignVariables, opts?: { theme?: 'light' | 'dark' }): SceneNode {
+  // Phase 25 slice D — dark is a sparse override layer: merge it over colors
+  // and resolve exactly as light does. Theme is a pure RENDER/EVALUATE
+  // parameter, never canvas state (versionHash and drift baselines must not
+  // fork on it).
+  const effective = opts?.theme === 'dark' && variables.dark?.colors
+    ? { ...variables, colors: { ...variables.colors, ...variables.dark.colors } }
+    : variables;
+  return deepResolve(structuredClone(node), effective);
 }
 
 const NESTED_TOKEN_PROPS = ['borderTop', 'borderRight', 'borderBottom', 'borderLeft'] as const;
@@ -133,6 +140,7 @@ export function setVariables(canvas: Canvas, vars: Partial<DesignVariables>): De
   if (vars.spacing) canvas.variables.spacing = { ...canvas.variables.spacing, ...vars.spacing };
   if (vars.radius) canvas.variables.radius = { ...canvas.variables.radius, ...vars.radius };
   if (vars.typography) canvas.variables.typography = { ...canvas.variables.typography, ...vars.typography };
+  if (vars.dark?.colors) canvas.variables.dark = { colors: { ...canvas.variables.dark?.colors, ...vars.dark.colors } };
   return canvas.variables;
 }
 
@@ -205,6 +213,7 @@ export function mergeDesignTokens(...layers: Array<DesignVariables | undefined>)
     if (layer.spacing) out.spacing = { ...(out.spacing ?? {}), ...layer.spacing };
     if (layer.radius) out.radius = { ...(out.radius ?? {}), ...layer.radius };
     if (layer.typography) out.typography = { ...(out.typography ?? {}), ...layer.typography };
+    if (layer.dark?.colors) out.dark = { colors: { ...(out.dark?.colors ?? {}), ...layer.dark.colors } };
   }
   return out;
 }
