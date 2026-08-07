@@ -487,7 +487,7 @@ The design-quality cluster's typographic + chromatic half (points 3, 4, 7, 8, 9,
 
 - [x] Slice A — typography correctness: full $token resolution (weight/family/lineHeight/letterSpacing), tabular numerals, measure + tracking checks
 - [x] Slice B — `generate_scale`: modular type + paired space tokens from a named ratio, optional fluid clamp() forms
-- [ ] Slice C — `src/color-system.ts` + `generate_color_system`: one seed → OKLCH ramps 50–900, matched neutral, status colors, semantic mapping
+- [x] Slice C — `src/color-system.ts` + `generate_color_system`: one seed → OKLCH ramps 50–900, matched neutral, status colors, semantic mapping
 - [ ] Slice D — dual theme: sparse `dark` token layer, theme param on render/evaluate/viewer, both-mode contrast + APCA info
 - [ ] Slice E — token-detachment lint (literal = token → $ref autofix) + motion token category
 - [ ] Slice F — agent surfaces: "derive, don't hand-pick" workflow + discoverability pins

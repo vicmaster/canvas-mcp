@@ -36,7 +36,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 | **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar, multi-series) |
 | **Pattern library** | 11 vetted page archetypes + 5 component scaffolds, all scoring > 95 with zero cliché tells; taxonomy axes + a diversification signal so successive screens vary |
 | **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` · `canvas_add_variant` clones a screen into a linked empty/loading/error state · `canvas_stress` content-perturbation testing (long text, i18n, big numbers, empty/many rows) |
-| **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import · `generate_scale` derives a modular type + spacing scale from a named ratio (optional fluid `clamp()` sizes) |
+| **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import · `generate_scale` derives a modular type + spacing scale from a named ratio (optional fluid `clamp()` sizes) · `generate_color_system` turns one seed color into OKLCH ramps + AA-checked semantic tokens |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
 | **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift · `framesmith verify` / `check-drift` CLI for CI/pre-commit gates, no MCP client needed |
 | **Viewer** | Browser gallery + detail view · quality inspector (score, issues, click-to-highlight) · design-system token panel · point-and-tell feedback (Comment mode + Feedback tab) |
@@ -396,6 +396,22 @@ Derive, don't hand-pick: a named ratio + a base size → a full modular **type s
 | `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
 
 Returns the generated tokens plus `overwrote` (existing names replaced). Reference results as `fontSize: "$text-lg"` (the full token spec applies through the ref) and `gap: "$space-md"`. Fluid `clamp()` sizes render as-is and are exempt from the numeric scale checks.
+
+### `generate_color_system`
+
+One seed color → a full perceptual color system, written to the workspace / project / canvas token layer of your choice:
+
+- **`primary-50` … `primary-900`** — an OKLCH ramp with perceptually even lightness steps and chroma tapered at the extremes; out-of-gamut colors clip toward lower chroma, never hue-shift. (The hand-rolled conversions are validated against Chrome's own `oklch()` parsing.)
+- **`neutral-50` … `neutral-900`** — a matched neutral carrying a whisper of the seed's hue: never dead grey, never visibly tinted.
+- **`success` / `warning` / `danger`** — status colors at one consistent lightness band.
+- **Semantic tokens** — `bg-primary`, `bg-surface`, `bg-elevated`, `text-primary`, `text-secondary`, `border`, `accent`: the same vocabulary the structure scaffolds already use. Text and accent steps are picked by **measured contrast** — every semantic text/surface pair clears WCAG AA *by construction*.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `seed` | string | The brand color everything derives from (`#RRGGBB`) |
+| `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
+
+The result also reports the **dark mapping** (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) — storage for it lands with the dual-theme slice. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
 
 ### `get_variables` / `set_variables`
 
