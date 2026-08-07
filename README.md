@@ -35,7 +35,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 |------|--------------|
 | **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar, multi-series) |
 | **Pattern library** | 11 vetted page archetypes + 5 component scaffolds, all scoring > 95 with zero cliché tells; taxonomy axes + a diversification signal so successive screens vary |
-| **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` |
+| **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` · `canvas_stress` content-perturbation testing (long text, i18n, big numbers, empty/many rows) |
 | **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
 | **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift · `framesmith verify` / `check-drift` CLI for CI/pre-commit gates, no MCP client needed |
@@ -380,6 +380,8 @@ Get computed bounding boxes via browser rendering.
 | `canvasId` | string | Canvas ID |
 | `nodeId` | string? | Root node to start from |
 | `maxDepth` | number? | Max depth (default 10) |
+
+Returns `{ nodeId, x, y, width, height, children? }` per node — plus, on any node whose content exceeds its box, overflow data (`scrollWidth`/`clientWidth`/`scrollHeight`/`clientHeight` and an `ellipsis` flag for designed truncation): the same capture `canvas_stress` uses to detect clipping.
 
 ### `get_variables` / `set_variables`
 
@@ -805,6 +807,28 @@ Runs `canvas_evaluate` in fast mode and returns just the subset of issues with a
 ```
 
 Apply the ops by joining them with newlines and passing to `batch_design`, then re-evaluate.
+
+### `canvas_stress`
+
+Content stress test — does the design survive real data? Re-renders the canvas under hostile-but-realistic content perturbations and reports exactly what broke, by node id. Never mutates the canvas.
+
+| Perturbation | What it does |
+|---|---|
+| `long-text` | Non-data text ×2.2 plus one long unbroken token (the wrap-breaker) |
+| `i18n` | Text ×1.4 — the German/Finnish expansion rule |
+| `big-numbers` | Data-like text to its widest realistic form: `9` → `999+`, `$1.5M` → `$1,520,847.33` |
+| `empty` | Detected tables lose their data rows |
+| `many` | Data rows ×3 |
+
+Finding kinds: `clip` (content cut off — *info* when a designed `text-overflow: ellipsis` is doing its job, *warning* otherwise), `overflow-x` (a node escapes its parent box or the canvas), `layout-shift` (an **untouched** node ballooning — perturbed nodes and their ancestors legitimately grow and are exempt). Only **new** breakage counts: anything already clipping at baseline is the design's standing state. Tables are found with the same inventory drift and coverage use; component instances are expanded first.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `canvasId` | string | Canvas to stress |
+| `perturbations` | string[]? | Subset of the five (default: all) |
+| `screenshots` | bool? | Attach a render of each perturbation that produced warnings |
+
+Returns `{ canvasId, versionHash, perturbations: [{ name, touchedCount, findings } | { name, skipped }], counts, verdict }` — `CLEAN` only with zero warnings. Fix findings with fluid widths, `minWidth` floors, and wrapping (see [Width strategies](docs/GUIDELINES.md#width-strategies) in the authoring guidelines), then re-run. Chrome required (~1 render per perturbation).
 
 ### `canvas_revise`
 

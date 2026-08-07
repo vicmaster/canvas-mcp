@@ -107,53 +107,70 @@ export interface LayoutRect {
   y: number;
   width: number;
   height: number;
+  /** Phase 24 slice D — overflow capture for stress testing. scroll* >
+   * client* means content is being cut off; `ellipsis` marks a designed
+   * truncation (text-overflow: ellipsis), reported softer. */
+  scrollWidth?: number;
+  clientWidth?: number;
+  scrollHeight?: number;
+  clientHeight?: number;
+  ellipsis?: boolean;
   children?: LayoutRect[];
 }
 
-export async function computeLayout(html: string, rootNodeId?: string, maxDepth = 10): Promise<LayoutRect[]> {
+/** Browser-side layout walker (string function — see the __name note at the
+ * call site). Captures rects plus overflow data (scroll* vs client*, ellipsis)
+ * only when content actually exceeds its box, so snapshots stay lean. */
+const LAYOUT_WALKER_SOURCE = `(function (rootId, depth) {
+  function getRect(el, currentDepth) {
+    var nodeId = el.getAttribute('data-node-id');
+    if (!nodeId) return null;
+    var rect = el.getBoundingClientRect();
+    var result = {
+      nodeId: nodeId,
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
+    if (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight) {
+      result.scrollWidth = el.scrollWidth;
+      result.clientWidth = el.clientWidth;
+      result.scrollHeight = el.scrollHeight;
+      result.clientHeight = el.clientHeight;
+      if (getComputedStyle(el).textOverflow === 'ellipsis') result.ellipsis = true;
+    }
+    if (currentDepth < depth) {
+      var childRects = [];
+      for (var i = 0; i < el.children.length; i++) {
+        var childRect = getRect(el.children[i], currentDepth + 1);
+        if (childRect) childRects.push(childRect);
+      }
+      if (childRects.length > 0) result.children = childRects;
+    }
+    return result;
+  }
+  var rootSelector = rootId ? '[data-node-id="' + rootId + '"]' : '[data-node-id]';
+  var root = document.querySelector(rootSelector);
+  if (!root) return [];
+  var result = getRect(root, 0);
+  return result ? [result] : [];
+})`;
+
+export async function computeLayout(html: string, rootNodeId?: string, maxDepth = 10, viewport?: { width: number; height: number }): Promise<LayoutRect[]> {
   const b = await getBrowser();
   const page = await b.newPage();
 
   try {
-    await page.setViewport({ width: 1440, height: 900 });
+    await page.setViewport({ width: viewport?.width ?? 1440, height: viewport?.height ?? 900 });
     await page.setContent(html, { waitUntil: 'domcontentloaded' });
 
+    // String-function walker — the tsx/esbuild `__name` workaround, same as
+    // DOM_WALKER_SOURCE in import.ts: a nested named function inside a normal
+    // page.evaluate callback gets an injected __name helper that doesn't
+    // exist in the browser context.
     const layouts = await page.evaluate(
-      (rootId: string | undefined, depth: number) => {
-        function getRect(el: Element, currentDepth: number): { nodeId: string; x: number; y: number; width: number; height: number; children?: ReturnType<typeof getRect>[] } | null {
-          const nodeId = el.getAttribute('data-node-id');
-          if (!nodeId) return null;
-
-          const rect = el.getBoundingClientRect();
-          const result: { nodeId: string; x: number; y: number; width: number; height: number; children?: ReturnType<typeof getRect>[] } = {
-            nodeId,
-            x: Math.round(rect.x),
-            y: Math.round(rect.y),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-          };
-
-          if (currentDepth < depth) {
-            const childRects: NonNullable<typeof result.children> = [];
-            for (const child of el.children) {
-              const childRect = getRect(child, currentDepth + 1);
-              if (childRect) childRects.push(childRect);
-            }
-            if (childRects.length > 0) result.children = childRects;
-          }
-
-          return result;
-        }
-
-        const rootSelector = rootId ? `[data-node-id="${rootId}"]` : '[data-node-id]';
-        const root = document.querySelector(rootSelector);
-        if (!root) return [];
-
-        const result = getRect(root, 0);
-        return result ? [result] : [];
-      },
-      rootNodeId,
-      maxDepth
+      `(${LAYOUT_WALKER_SOURCE})(${JSON.stringify(rootNodeId ?? null)}, ${JSON.stringify(maxDepth)})`,
     );
 
     return layouts as LayoutRect[];
