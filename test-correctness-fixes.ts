@@ -27,7 +27,9 @@ function textOnBg(textColor: string, bg: string): Canvas {
   };
   return { id: 'c1', name: 'c', projectId: 'p', root, components: {}, variables: {}, createdAt: '', lastModified: '' } as Canvas;
 }
-const colorIssue = (r: { issues: Array<{ category: string; nodeId?: string }> }) => r.issues.find((i) => i.category === 'color' && i.nodeId === 't1');
+// Only WCAG failures (error severity) count here — Phase 25's APCA advisory
+// legitimately adds INFO issues on WCAG-passing boundary pairs.
+const colorIssue = (r: { issues: Array<{ category: string; nodeId?: string; severity?: string }> }) => r.issues.find((i) => i.category === 'color' && i.nodeId === 't1' && i.severity === 'error');
 
 // ── 1. Contrast rounding ──────────────────────────────────────────────────────
 // Find a near-gray-on-white pair whose TRUE ratio sits just under 4.5 but rounds

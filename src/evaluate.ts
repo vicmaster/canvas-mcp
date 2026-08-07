@@ -716,7 +716,14 @@ function checkStructure(entries: NodeEntry[], canvas: Canvas): CheckResult {
   return { score: Math.max(0, Math.min(100, Math.round(score))), issues };
 }
 
-function checkConsistency(entries: NodeEntry[]): CheckResult {
+/** Phase 25 slice E — raw entries + merged tokens power the token-detachment
+ * lint and the motion nudge. Both are SCORE-NEUTRAL info advisories. */
+interface ConsistencyContext {
+  rawEntries?: NodeEntry[];
+  tokens?: DesignVariables;
+}
+
+function checkConsistency(entries: NodeEntry[], ctx: ConsistencyContext = {}): CheckResult {
   const issues: EvaluationIssue[] = [];
   let score = 100;
 
@@ -768,11 +775,80 @@ function checkConsistency(entries: NodeEntry[]): CheckResult {
     }
   }
 
+  // ── Phase 25 slice E — token-detachment lint (score-neutral, cap 20) ──
+  // A literal that EQUALS a token's value is drift-in-waiting: the token
+  // changes, the literal doesn't. Exact equality only (spec C8) — nearest-
+  // match suggestions belong to import-time snapping; the evaluator never
+  // guesses. Checked on RAW nodes ($refs already look literal after resolve).
+  if (ctx.rawEntries && ctx.tokens) {
+    const colorToTokens = new Map<string, string[]>();
+    for (const [name, value] of Object.entries(ctx.tokens.colors ?? {})) {
+      const key = value.trim().toLowerCase();
+      colorToTokens.set(key, [...(colorToTokens.get(key) ?? []), name]);
+    }
+    const radiusToTokens = new Map<number, string[]>();
+    for (const [name, value] of Object.entries(ctx.tokens.radius ?? {})) {
+      radiusToTokens.set(value, [...(radiusToTokens.get(value) ?? []), name]);
+    }
+    let detached = 0;
+    for (const { node } of ctx.rawEntries) {
+      if (detached >= 20) break;
+      if (node.type === 'document') continue; // createCanvas's default white fill is not an authored literal
+      let found: { prop: string; literal: string; tokens: string[] } | null = null;
+      for (const prop of ['fill', 'stroke', 'color'] as const) {
+        const v = node[prop];
+        if (typeof v !== 'string' || v.startsWith('$')) continue;
+        const names = colorToTokens.get(v.trim().toLowerCase());
+        if (names?.length) { found = { prop, literal: v, tokens: names }; break; }
+      }
+      if (!found && typeof node.cornerRadius === 'number') {
+        const names = radiusToTokens.get(node.cornerRadius);
+        if (names?.length) found = { prop: 'cornerRadius', literal: String(node.cornerRadius), tokens: names };
+      }
+      if (!found) continue;
+      detached++;
+      const unique = found.tokens.length === 1;
+      issues.push({
+        category: 'consistency',
+        severity: 'info',
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `Literal ${found.prop}: ${found.literal} equals ${unique ? `the $${found.tokens[0]} token` : `${found.tokens.length} tokens (${found.tokens.map((t) => '$' + t).join(', ')})`} — detached literals drift when the token changes.`,
+        suggestion: unique
+          ? `Reference the token: ${found.prop}: "$${found.tokens[0]}".`
+          : 'Reference whichever token carries the INTENT here — multiple tokens share this value, so no automatic fix (never guess).',
+        ...(unique ? { fix: { op: formatUpdateOp(node.id, { [found.prop]: `$${found.tokens[0]}` }), rationale: `Re-attach the literal to $${found.tokens[0]} so it follows the design system.` } } : {}),
+      });
+    }
+
+    // ── motion nudge — ad-hoc timing sprawl without motion tokens ──
+    if (!ctx.tokens.motion || Object.keys(ctx.tokens.motion).length === 0) {
+      const combos = new Set<string>();
+      for (const { node } of ctx.rawEntries) {
+        if (node.transition && typeof node.transition === 'object' && typeof node.transition.duration === 'number') {
+          combos.add(`${node.transition.duration}|${node.transition.easing ?? 'ease'}`);
+        }
+        if (node.animation?.duration !== undefined || node.animation?.easing !== undefined) {
+          combos.add(`${node.animation.duration ?? 300}|${node.animation.easing ?? 'ease'}`);
+        }
+      }
+      if (combos.size >= 3) {
+        issues.push({
+          category: 'consistency',
+          severity: 'info',
+          nodeId: entries[0].node.id,
+          message: `${combos.size} distinct ad-hoc duration/easing combinations and no motion tokens — timing drifts apart without a motion language.`,
+          suggestion: 'Declare motion tokens (set_variables motion: { fast: { duration: 150, easing: "ease-out" }, … }) and reference them as transition: "$motion.fast".',
+        });
+      }
+    }
+  }
+
   return { score: Math.max(0, Math.min(100, Math.round(score))), issues };
 }
 
-function checkConsistencyDetailed(entries: NodeEntry[], layoutRects: LayoutRect[]): CheckResult {
-  const baseResult = checkConsistency(entries);
+function checkConsistencyDetailed(entries: NodeEntry[], layoutRects: LayoutRect[], ctx: ConsistencyContext = {}): CheckResult {
+  const baseResult = checkConsistency(entries, ctx);
   const issues = [...baseResult.issues];
   let score = baseResult.score;
 
@@ -1577,10 +1653,11 @@ export async function evaluateCanvas(
     results.set('structure', checkStructure(rawEntries, canvas));
   }
   if (activeCategories.includes('consistency')) {
+    const consistencyCtx = { rawEntries, tokens: mergedTokens };
     if (options.mode === 'detailed' && detailedLayout) {
-      results.set('consistency', checkConsistencyDetailed(entries, detailedLayout));
+      results.set('consistency', checkConsistencyDetailed(entries, detailedLayout, consistencyCtx));
     } else {
-      results.set('consistency', checkConsistency(entries));
+      results.set('consistency', checkConsistency(entries, consistencyCtx));
     }
   }
   let coverageReport: EvaluationResult['coverage'];

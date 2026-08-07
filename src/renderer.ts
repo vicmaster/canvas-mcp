@@ -120,6 +120,8 @@ const FONT_FORMAT_BY_EXT: Array<[RegExp, string]> = [
 // Family is interpolated inside `font-family: "..."` — disallow any char that
 // could escape the quoted string or close the declaration.
 const ALLOWED_EASINGS = new Set(['ease', 'ease-in', 'ease-out', 'ease-in-out', 'linear']);
+// Motion tokens carry custom curves (Phase 25 slice E) — allow the safe shape.
+const SAFE_CUBIC_BEZIER = /^cubic-bezier\(\s*-?[\d.]+\s*,\s*-?[\d.]+\s*,\s*-?[\d.]+\s*,\s*-?[\d.]+\s*\)$/;
 const CSS_IDENT = /^[a-zA-Z][a-zA-Z0-9-]*$/;
 
 // Permissive but escape-proof: allow standard SVG path data chars
@@ -601,10 +603,10 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
 
   // Transition: validate property name + easing; ignore the field entirely if
   // anything looks suspicious.
-  if (node.transition && typeof node.transition.duration === 'number') {
+  if (node.transition && typeof node.transition === 'object' && typeof node.transition.duration === 'number') {
     const t = node.transition;
     const prop = t.property && CSS_IDENT.test(t.property) ? t.property : 'all';
-    const easing = ALLOWED_EASINGS.has(t.easing ?? '') ? t.easing : 'ease';
+    const easing = ALLOWED_EASINGS.has(t.easing ?? '') || SAFE_CUBIC_BEZIER.test(t.easing ?? '') ? t.easing : 'ease';
     const delay = typeof t.delay === 'number' ? `${t.delay}ms` : '0ms';
     s.push(`transition: ${prop} ${t.duration}ms ${easing} ${delay}`);
   }

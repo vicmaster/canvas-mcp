@@ -274,7 +274,7 @@ R("nodeId", { type: "text", content: "Replaced" })
 
 **Node types:** `frame`, `text`, `rectangle`, `ellipse`, `image`, `icon`, `path`, `component`, `instance`, `toggle`, `checkbox`, `radio`, `select`, `chart`, `skeleton` (loading-placeholder block — token-derived neutral fill; pulses subtly in the live viewer, always static in screenshots/exports so diffs stay deterministic; `pulse: false` opts a block out)
 
-**Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"`), `gap`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `tabularNums`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow`, `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition`, `kind`, `series`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
+**Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"`), `gap`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `tabularNums`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow`, `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition` (object, or `"$motion.<name>"` referencing a motion token), `kind`, `series`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
 
 Use `textTransform: "uppercase"` for uppercase labels (don't bake casing into `content`), `letterSpacing` for tracking, and `fontVariationSettings` (e.g. `'"wght" 650'`) for variable-font axes.
 
@@ -416,17 +416,18 @@ The **dark theme ships in the same call**: the semantic dark mapping (Radix patt
 
 ### `get_variables` / `set_variables`
 
-Read and write design tokens (colors, spacing, radius, typography — plus a `dark` override layer). Use `$tokenName` in node properties to reference variables. The `dark` layer is SPARSE, keyed by token name: anything not overridden inherits the light value; it drives `theme: "dark"` renders and the dual-theme contrast check.
+Read and write design tokens (colors, spacing, radius, typography — plus a `dark` override layer and `motion` tokens: `{ duration, easing }` pairs referenced from nodes as `transition: "$motion.<name>"`). Use `$tokenName` in node properties to reference variables. The `dark` layer is SPARSE, keyed by token name: anything not overridden inherits the light value; it drives `theme: "dark"` renders and the dual-theme contrast check.
 
 ```json
 {
   "colors": { "primary": "#e94560", "bg": "#1a1a2e" },
   "spacing": { "sm": 8, "md": 16, "lg": 24 },
-  "radius": { "sm": 4, "md": 8 }
+  "radius": { "sm": 4, "md": 8 },
+  "motion": { "fast": { "duration": 150, "easing": "ease-out" } }
 }
 ```
 
-Then use in nodes: `{ fill: "$primary", padding: "$md", cornerRadius: "$sm" }`
+Then use in nodes: `{ fill: "$primary", padding: "$md", cornerRadius: "$sm", transition: "$motion.fast" }`
 
 ### `workspace_set_design_system` / `workspace_get_design_system` / `workspace_apply_preset`
 
@@ -735,7 +736,7 @@ Whenever the `coverage` category runs on a **base** canvas, the result also carr
 | `color` | 25 | WCAG AA contrast ratios for text against nearest background — checked in BOTH themes when a `dark` token layer exists (dark-run issues carry `theme: "dark"`, score takes the worse theme, and dark failures point at the dark layer instead of carrying a literal fix). WCAG-passing pairs that are perceptually weak by **APCA** get an info advisory (Lc vs ~75 body / ~60 large) — APCA is a candidate method, not a standard; it never blocks |
 | `typography` | 20 | Type-scale ratios (1.1–2.0; adjacent sizes both declared as typography tokens are pinned and skip the check), font-family count, weight variation — plus score-neutral craft advisories: measure (prose past ~75 characters per line; warning past 90), tracking (display text ≥28px without negative letter-spacing, autofixable), and tabular numerals (numeric table columns without `tabularNums`, autofixable) |
 | `structure` | 15 | Tree depth, naming coverage, design-token usage %, component reuse |
-| `consistency` | 20 | Frames missing `layout`, inconsistent sibling padding, sibling overlap (detailed mode) |
+| `consistency` | 20 | Frames missing `layout`, inconsistent sibling padding, sibling overlap (detailed mode) — plus score-neutral advisories: **token detachment** (a literal `fill`/`stroke`/`color`/`cornerRadius` that exactly equals a token's value flags with a mechanical `$ref` autofix; ambiguous matches list candidates and never guess) and **ad-hoc motion** (3+ distinct duration/easing combos with no motion tokens declared) |
 | `cliche` | 15 | Machine-made tells: default purple/indigo accent, gradient/glow overuse, fake browser/OS chrome (traffic-light dots), the hanging eyebrow-beside-heading header, fabricated metrics/testimonials/logos, eyebrow rhythm (an eyebrow above nearly every section), slop copy (stock AI phrasing — filler verbs, scroll cues, placeholder names, hype labels), radius consistency (too many distinct corner radii), pure black/white (`#000000` ink / `#ffffff` page vs off-black/off-white), accent consistency (multiple competing accent hues). Each issue carries a `tell` discriminator; all advisory (warning/info). Relaxable per `genre`. |
 | `coverage` | 10 | State coverage on **base** canvases with data-bearing content: a detected table demands designed `empty` + `loading` variants, a form (3+ input controls) demands `error` — each missing state is a directive-blocking warning whose suggestion names the `canvas_add_variant` + scaffold path. Variant canvases and non-data screens get no findings. The result's `coverage` field reports `{ dataBearing, states, missing }`. |
 
@@ -816,7 +817,7 @@ Runs `canvas_evaluate` in fast mode and returns just the subset of issues with a
 **What gets auto-fixed**
 
 - **Spacing** — off-scale `gap` or scalar `padding` snaps to the nearest scale value; array `padding` gets one fix per node that writes the complete snapped array (e.g. `[9, 0, 9, 18]` → `[8, 0, 8, 16]`).
-- **Consistency** — frames with multiple children but no `layout` get `layout: "vertical"`.
+- **Consistency** — frames with multiple children but no `layout` get `layout: "vertical"`; a literal `fill`/`stroke`/`color`/`cornerRadius` that exactly equals a single token's value gets re-pointed to `$token` (a value shared by multiple tokens is reported with candidates but never auto-fixed — no guessing).
 - **Color** — recoverable WCAG contrast failures get `color: "#000000"` or `"#FFFFFF"`, whichever wins against the resolved background. Failures so bad that neither black nor white meets the threshold are not auto-fixed (the background also needs to change).
 - **Cliché** — a *known-default* purple/indigo accent (`#6366f1` and friends) written literally on a node swaps to a neutral accent; a dedicated fake-chrome strip (a row that is just traffic-light dots) gets a `D(...)` delete; pure-black ink (`#000000` text/icon/stroke) softens to off-black. Taste-dependent tells (gradient/glow overuse, the hanging header, fabricated copy, eyebrow rhythm, slop copy, mixed radius systems, competing accents) are reported by `canvas_evaluate` with a suggestion but carry **no** auto-fix op.
 - **Coverage** — missing state variants (empty/loading/error) have no mechanical fix either — designing a state is a judgment call. `canvas_evaluate` reports the gap with a suggestion naming the `canvas_add_variant` + scaffold path.

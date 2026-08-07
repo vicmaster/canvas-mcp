@@ -174,9 +174,9 @@ export interface SceneNode {
   transition?: {
     property?: string;   // e.g. 'all', 'opacity', 'transform'. Identifier chars only.
     duration: number;    // ms
-    easing?: 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'linear';
+    easing?: string;     // named easing or cubic-bezier(...) — unsafe values fall back to 'ease'
     delay?: number;      // ms
-  };
+  } | string;            // "$motion.<name>" — resolves to the motion token's { duration, easing }
 
   // Chart (only for type: 'chart'). Sized by width/height like any node;
   // fill/stroke/cornerRadius style the box, series carry the plot colors.
@@ -208,6 +208,10 @@ export interface DesignVariables {
    * and evaluation merge it over `colors` when theme = "dark"; storage stays
    * one flat, diffable object per layer. */
   dark?: { colors?: Record<string, string> };
+  /** Phase 25 slice E — motion tokens (the Carbon/Atlassian pattern):
+   * duration + easing packaged under a name, referenced from `transition`
+   * as the string "$motion.<name>". */
+  motion?: Record<string, { duration: number; easing: string }>;
 }
 
 /** Custom font face declaration. Renderer emits a single `@font-face` rule
