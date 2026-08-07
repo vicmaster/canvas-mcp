@@ -1637,7 +1637,7 @@ Stamping a genre does NOT move the canvas's versionHash (the hash covers design 
 // --- canvas_evaluate ---
 server.tool(
   'canvas_evaluate',
-  `Auto-score a design canvas against quality criteria. Returns an overall score (0-100), category scores, and actionable issues referencing specific node IDs. Categories: spacing, color, typography, structure, consistency (craft), plus "cliche" — the machine-made tells: default purple/indigo accents, gradient/glow overuse, fake browser/phone chrome (traffic-light dots), the hanging eyebrow-beside-heading header, fabricated-looking metrics/testimonials/logos, too many eyebrow labels (template rhythm — an eyebrow above nearly every section), slop copy (stock AI phrasing: filler verbs, scroll cues, placeholder names like "Jane Doe", hype labels), mixed radius systems (radius consistency — too many distinct corner radii), pure black/white (harsh #000000 ink or a stark #ffffff page vs a designed off-black/off-white), and competing accents (accent consistency — more than one accent hue). cliche issues carry a "tell" discriminator and are advisory (warning/info). Modes:
+  `Auto-score a design canvas against quality criteria. Returns an overall score (0-100), category scores, and actionable issues referencing specific node IDs. Categories: spacing, color, typography, structure, consistency (craft), plus "cliche" — the machine-made tells: default purple/indigo accents, gradient/glow overuse, fake browser/phone chrome (traffic-light dots), the hanging eyebrow-beside-heading header, fabricated-looking metrics/testimonials/logos, too many eyebrow labels (template rhythm — an eyebrow above nearly every section), slop copy (stock AI phrasing: filler verbs, scroll cues, placeholder names like "Jane Doe", hype labels), mixed radius systems (radius consistency — too many distinct corner radii), pure black/white (harsh #000000 ink or a stark #ffffff page vs a designed off-black/off-white), and competing accents (accent consistency — more than one accent hue). cliche issues carry a "tell" discriminator and are advisory (warning/info). Plus "coverage" (Phase 24): a BASE canvas whose content carries data — a detected table (empty + loading demanded) or a form of 3+ input controls (error demanded) — gets a directive-blocking WARNING per missing state variant; the result's "coverage" field reports { dataBearing, states, missing }. Designing the state is one canvas_add_variant + one scaffold stamp (empty-state / skeleton-table / skeleton-card); variant canvases themselves and non-data screens get no coverage findings. Modes:
   - "fast": JSON-only, <100ms, deterministic heuristics only.
   - "detailed": adds Puppeteer-based pixel overlap detection in the consistency category.
   - "llm": fast-mode heuristics plus a vision-model critique against a FIXED rubric (provider picked from FRAMESMITH_LLM_PROVIDER env var, or whichever of ANTHROPIC_API_KEY / OPENAI_API_KEY is set). Adds an "llmCritique" field: { rubric: { hierarchy, execution, specificity, restraint, variety } each {score 1-5, rationale}, score (0-100 derived), summary, suggestions, needsRevision, failingAxes }. The verdict is stamped on the canvas (metadata.critique) + the per-project build log for auditability. Cost: one paid API call per invocation. To CLOSE the loop and auto-fix failing axes, use canvas_revise.
@@ -1649,7 +1649,7 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
   {
     canvasId: z.string().describe('Canvas ID to evaluate'),
     mode: z.enum(['fast', 'detailed', 'llm']).default('fast').describe('"fast" = JSON-only (<100ms), "detailed" = + Puppeteer layout checks, "llm" = fast + vision-model rubric critique'),
-    categories: z.array(z.enum(['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche']))
+    categories: z.array(z.enum(['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche', 'coverage']))
       .optional()
       .describe('Specific categories to evaluate (default: all)'),
     genre: z.string().optional()
@@ -1662,7 +1662,10 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
-    const result = await evaluateCanvas(canvas, { mode, categories, genre });
+    // Phase 24 slice C — the coverage check needs to know which state
+    // variants exist for this canvas (sibling lookup, store-level).
+    const designedStates = listCanvases().find((r) => r.id === canvasId)?.variants?.map((v) => v.state) ?? [];
+    const result = await evaluateCanvas(canvas, { mode, categories, genre, designedStates });
 
     if (mode === 'llm') {
       try {
@@ -1710,10 +1713,10 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
 // --- canvas_autofix ---
 server.tool(
   'canvas_autofix',
-  `Run canvas_evaluate in fast mode and return the subset of issues that have a mechanically derived fix (off-scale spacing — gap, scalar AND array-form padding (the fix writes the complete snapped array) — → snap to scale; missing layout on multi-child frame → set vertical; recoverable WCAG contrast failure → switch text to #000 or #FFF, whichever wins; default-purple accent → swap to a neutral accent; fake-chrome strip → delete; pure-black ink → soften to off-black). By default this PROPOSES: each fix carries a ready-to-paste \`batch_design\` op string and a one-line rationale. Pass apply: true to also WRITE the fixes to the canvas in the same call — the result then reports applied/failed per op. Taste-dependent cliche tells (gradient/glow overuse, the hanging header, fabricated content, eyebrow-rhythm overuse, slop copy, mixed radius systems, competing accents) carry a suggestion but no auto-fix — call canvas_evaluate to see those. Closes the generator-evaluator loop: generate with batch_design → autofix (apply: true) → re-evaluate.`,
+  `Run canvas_evaluate in fast mode and return the subset of issues that have a mechanically derived fix (off-scale spacing — gap, scalar AND array-form padding (the fix writes the complete snapped array) — → snap to scale; missing layout on multi-child frame → set vertical; recoverable WCAG contrast failure → switch text to #000 or #FFF, whichever wins; default-purple accent → swap to a neutral accent; fake-chrome strip → delete; pure-black ink → soften to off-black). By default this PROPOSES: each fix carries a ready-to-paste \`batch_design\` op string and a one-line rationale. Pass apply: true to also WRITE the fixes to the canvas in the same call — the result then reports applied/failed per op. Taste-dependent cliche tells (gradient/glow overuse, the hanging header, fabricated content, eyebrow-rhythm overuse, slop copy, mixed radius systems, competing accents) carry a suggestion but no auto-fix — call canvas_evaluate to see those. Coverage warnings (missing empty/loading/error state variants) also have no mechanical fix: designing a state is judgment — the suggestion names the canvas_add_variant + scaffold path. Closes the generator-evaluator loop: generate with batch_design → autofix (apply: true) → re-evaluate.`,
   {
     canvasId: z.string().describe('Canvas ID to autofix'),
-    categories: z.array(z.enum(['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche']))
+    categories: z.array(z.enum(['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche', 'coverage']))
       .optional()
       .describe('Restrict to fixes from these categories (default: all)'),
     genre: z.string().optional()
@@ -1726,7 +1729,8 @@ server.tool(
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
-    const result = await evaluateCanvas(canvas, { mode: 'fast', categories, genre });
+    const designedStates = listCanvases().find((r) => r.id === canvasId)?.variants?.map((v) => v.state) ?? [];
+    const result = await evaluateCanvas(canvas, { mode: 'fast', categories, genre, designedStates });
     const fixes = result.issues
       .filter((issue) => issue.fix)
       .map((issue) => ({

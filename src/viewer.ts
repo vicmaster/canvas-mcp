@@ -827,11 +827,19 @@ ${FAVICON_HTML}
 const scoreCache = new Map<string, EvaluationResult>();
 
 /** FNV-1a over the evaluation's actual inputs. Exported for tests. */
+/** The state variants designed for a canvas (sibling lookup, non-archived). */
+function designedStatesFor(canvasId: string): string[] {
+  return listCanvases().find((r) => r.id === canvasId)?.variants?.map((v) => v.state) ?? [];
+}
+
 export function evalCacheKey(canvas: Canvas): string {
   const genre = (canvas.metadata?.provenance as { preset?: string } | undefined)?.preset ?? '';
   let tokens = '';
   try { tokens = JSON.stringify(getCanvasTokens(canvas)); } catch { /* mirrored canvas with no live project — tree + genre still key it */ }
-  const payload = `${JSON.stringify(canvas.root)}|${tokens}|${genre}|${JSON.stringify(canvas.components ?? {})}`;
+  // Phase 24 slice C — the coverage check reads the canvas's designed state
+  // variants, so adding/removing a variant must invalidate the base's score.
+  const states = designedStatesFor(canvas.id).sort().join(',');
+  const payload = `${JSON.stringify(canvas.root)}|${tokens}|${genre}|${JSON.stringify(canvas.components ?? {})}|${states}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < payload.length; i++) {
     h ^= payload.charCodeAt(i);
@@ -848,7 +856,7 @@ async function evalFor(canvas: Canvas): Promise<EvaluationResult | null> {
   try {
     // Match the agent: relax tells for the canvas's own genre (provenance preset).
     const genre = (canvas.metadata?.provenance as { preset?: string } | undefined)?.preset;
-    const result = await evaluateCanvas(canvas, { mode: 'fast', genre });
+    const result = await evaluateCanvas(canvas, { mode: 'fast', genre, designedStates: designedStatesFor(canvas.id) });
     if (scoreCache.size > 200) scoreCache.delete(scoreCache.keys().next().value as string);
     scoreCache.set(key, result);
     return result;

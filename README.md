@@ -26,7 +26,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 
 1. **Start from taste, not a blank canvas.** The agent stamps one of **11 vetted page patterns** (dashboard, auth, pricing, settings, onboarding, and more) — each regression-tested to score **> 95 with zero cliché tells** across every theme — then adapts it. A blank canvas is where slop comes from; a pattern is a non-slop starting point. *(`list_structures` / `apply_structure`)*
 2. **Use the whole toolkit — like a real UI does.** Real icons (Lucide + Material Symbols), fonts resolved by name, real input controls (`toggle` / `checkbox` / `radio` / `select`), data-driven charts (line/bar, multi-series), reusable components, and layered design tokens — never faked with Unicode glyphs, stray ellipses, or hand-drawn SVG paths standing in for a chart.
-3. **Evaluate, then self-correct.** `canvas_evaluate` scores the design across six craft categories plus a **cliché-tell** detector, and returns a **`READY` / `NOT READY` directive**. The agent resolves every warning and tell and only presents once it's `READY` — polishing to the bar is the agent's job, not yours.
+3. **Evaluate, then self-correct.** `canvas_evaluate` scores the design across five craft categories plus a **cliché-tell** detector and a **state-coverage** check (a data screen without designed empty/loading states isn't done), and returns a **`READY` / `NOT READY` directive**. The agent resolves every warning and tell and only presents once it's `READY` — polishing to the bar is the agent's job, not yours.
 4. **Review in the browser, own the output.** You browse canvases like design files, with a live **quality inspector** and **design-system panel**. Designs persist as **open JSON checked into your repo** — no proprietary format, no lock-in — and can be re-imported from shipped HTML to keep the design honest.
 
 ## Capabilities at a glance
@@ -35,7 +35,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 |------|--------------|
 | **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar, multi-series) |
 | **Pattern library** | 11 vetted page archetypes + 5 component scaffolds, all scoring > 95 with zero cliché tells; taxonomy axes + a diversification signal so successive screens vary |
-| **Quality & taste** | `canvas_evaluate` (6 categories + cliché tells) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` |
+| **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` |
 | **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
 | **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift · `framesmith verify` / `check-drift` CLI for CI/pre-commit gates, no MCP client needed |
@@ -683,11 +683,13 @@ Open point-and-tell comments block too: when the canvas has any, the result carr
 
 Whenever the `cliche` category runs, the result also carries a **`genre`** field auditing the genre decision: `{ active, source, relaxed, notRelaxed }` — the genre in effect, whether it came from the `genre` param or the canvas's provenance stamp, the tells it relaxed, and `notRelaxed` (`[{ tell, relaxedBy }]`) — tells still flagging that a *different* genre would relax. A score pinned by tells listed in `notRelaxed` usually means the wrong genre was declared.
 
+Whenever the `coverage` category runs on a **base** canvas, the result also carries a **`coverage`** field: `{ dataBearing, states, missing }` — whether the screen carries data-bearing content, which state variants (`canvas_add_variant`) already exist, and which demanded states are missing. It's absent on variant canvases (a variant *is* a designed state, so it doesn't demand states of itself).
+
 | Param | Type | Description |
 |-------|------|-------------|
 | `canvasId` | string | Canvas ID to evaluate |
 | `mode` | `"fast"` \| `"detailed"` \| `"llm"` | `"fast"` = JSON-tree analysis only (<100ms). `"detailed"` adds Puppeteer-based pixel-level overlap checks. `"llm"` runs fast-mode heuristics plus a vision-model critique (provider picked from `FRAMESMITH_LLM_PROVIDER` or whichever of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` is set — costs one paid API call per invocation). Default `"fast"`. |
-| `categories` | string[]? | Subset of `spacing`, `color`, `typography`, `structure`, `consistency`, `cliche`. Defaults to all. |
+| `categories` | string[]? | Subset of `spacing`, `color`, `typography`, `structure`, `consistency`, `cliche`, `coverage`. Defaults to all. |
 | `genre` | string? | Style that relaxes specific `cliche` gates — `"material"` allows purple and white elevated surfaces; `"dashboard"` (alias `"data"`) allows realistic figures on data-dense screens. Defaults to the canvas's provenance preset if stamped (`canvas_set_genre` stamps it durably, no token churn). Pick by what the screen is *for* (read screens with published figures → `dashboard`; editors/admin forms → `material`), not what it contains — the result's `genre` field audits the choice. |
 
 **Categories and what they check**
@@ -700,6 +702,7 @@ Whenever the `cliche` category runs, the result also carries a **`genre`** field
 | `structure` | 15 | Tree depth, naming coverage, design-token usage %, component reuse |
 | `consistency` | 20 | Frames missing `layout`, inconsistent sibling padding, sibling overlap (detailed mode) |
 | `cliche` | 15 | Machine-made tells: default purple/indigo accent, gradient/glow overuse, fake browser/OS chrome (traffic-light dots), the hanging eyebrow-beside-heading header, fabricated metrics/testimonials/logos, eyebrow rhythm (an eyebrow above nearly every section), slop copy (stock AI phrasing — filler verbs, scroll cues, placeholder names, hype labels), radius consistency (too many distinct corner radii), pure black/white (`#000000` ink / `#ffffff` page vs off-black/off-white), accent consistency (multiple competing accent hues). Each issue carries a `tell` discriminator; all advisory (warning/info). Relaxable per `genre`. |
+| `coverage` | 10 | State coverage on **base** canvases with data-bearing content: a detected table demands designed `empty` + `loading` variants, a form (3+ input controls) demands `error` — each missing state is a directive-blocking warning whose suggestion names the `canvas_add_variant` + scaffold path. Variant canvases and non-data screens get no findings. The result's `coverage` field reports `{ dataBearing, states, missing }`. |
 
 **Return shape**
 
@@ -720,6 +723,7 @@ Whenever the `cliche` category runs, the result also carries a **`genre`** field
   "stats": { "totalNodes": 14, "textNodes": 5, "frameNodes": 8, "maxDepth": 4, "tokenUsagePercent": 61, "componentReusePercent": 0 },
   "mode": "fast",
   "genre": { "active": null, "source": null, "relaxed": [], "notRelaxed": [{ "tell": "accent-hue", "relaxedBy": ["material"] }] },
+  "coverage": { "dataBearing": true, "states": [], "missing": ["empty", "loading"] },
   "directive": "NOT READY — 87/100 with 1 issue(s) to resolve. Fix them now: canvas_autofix for the mechanical subset, batch_design for the rest, then re-run canvas_evaluate. Repeat until there are zero warnings/cliché tells and the score is > 95. Do NOT show this design to the user yet."
 }
 ```
@@ -780,6 +784,7 @@ Runs `canvas_evaluate` in fast mode and returns just the subset of issues with a
 - **Consistency** — frames with multiple children but no `layout` get `layout: "vertical"`.
 - **Color** — recoverable WCAG contrast failures get `color: "#000000"` or `"#FFFFFF"`, whichever wins against the resolved background. Failures so bad that neither black nor white meets the threshold are not auto-fixed (the background also needs to change).
 - **Cliché** — a *known-default* purple/indigo accent (`#6366f1` and friends) written literally on a node swaps to a neutral accent; a dedicated fake-chrome strip (a row that is just traffic-light dots) gets a `D(...)` delete; pure-black ink (`#000000` text/icon/stroke) softens to off-black. Taste-dependent tells (gradient/glow overuse, the hanging header, fabricated copy, eyebrow rhythm, slop copy, mixed radius systems, competing accents) are reported by `canvas_evaluate` with a suggestion but carry **no** auto-fix op.
+- **Coverage** — missing state variants (empty/loading/error) have no mechanical fix either — designing a state is a judgment call. `canvas_evaluate` reports the gap with a suggestion naming the `canvas_add_variant` + scaffold path.
 
 **Return shape**
 

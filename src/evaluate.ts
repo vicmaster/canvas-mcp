@@ -3,6 +3,7 @@ import { resolveVariables } from './variables.js';
 import { getCanvasTokens } from './workspaces.js';
 import { renderToHtml } from './renderer.js';
 import { computeLayout, type LayoutRect } from './screenshot.js';
+import { extractInventory, expandInstances } from './drift.js';
 
 // --- Types ---
 
@@ -78,6 +79,13 @@ export interface EvaluationResult {
    * evaluation cycle.
    */
   genre?: GenreReport;
+  /**
+   * Phase 24 slice C — present when the coverage category ran on a BASE
+   * canvas: whether the screen carries data-bearing content (tables / forms),
+   * which state variants are designed, and which demanded states are missing
+   * (each missing state is also a warning issue). Absent on variant canvases.
+   */
+  coverage?: { dataBearing: boolean; states: string[]; missing: string[] };
   /**
    * Present only when mode is 'llm'. The heuristic categories above still run
    * (so you don't lose the deterministic signal); this field carries the
@@ -1296,11 +1304,61 @@ const CATEGORY_WEIGHTS = new Map([
   ['structure', 15],
   ['consistency', 20],
   ['cliche', 15],
+  ['coverage', 10],
 ]);
+
+// ── Phase 24 slice C — state coverage ───────────────────────────────────────
+// A data-bearing screen isn't done when the happy path looks good: the empty
+// table, the loading skeleton, and the form error are designed surfaces too,
+// and "the three states AI always forgets" is how they get skipped. This
+// check DEMANDS them (warning severity — directive-blocking) on base
+// canvases whose content carries data; non-data screens and variant canvases
+// themselves are silent. Detection reuses the drift inventory so drift,
+// coverage, and (slice D) stress share one vocabulary for "a table".
+// Deliberately conservative: header-less card lists aren't detected yet —
+// a false negative is today's status quo, a false positive is friction.
+
+/** What each kind of data-bearing content demands (spec C4). */
+const COVERAGE_DEMANDS: { kind: string; demands: string[]; detect: (inv: ReturnType<typeof extractInventory>) => boolean; noun: string }[] = [
+  { kind: 'table', demands: ['empty', 'loading'], detect: (inv) => inv.tables.length > 0, noun: 'a data table' },
+  { kind: 'form', demands: ['error'], detect: (inv) => inv.counts.controls >= 3, noun: 'a form (3+ input controls)' },
+];
+
+/** Scaffold hint per demanded state — the cheap way to comply (slice B). */
+const COVERAGE_HINTS: Record<string, string> = {
+  empty: 'canvas_add_variant with state "empty", delete the data rows, stamp the empty-state scaffold where they were.',
+  loading: 'canvas_add_variant with state "loading", replace the data rows with the skeleton-table (or skeleton-card) scaffold.',
+  error: 'canvas_add_variant with state "error", show the form\'s validation-failure treatment (field messages + summary).',
+};
+
+function checkCoverage(canvas: Canvas, designedStates: string[]): { result: CheckResult; report?: EvaluationResult['coverage'] } {
+  // A variant IS a designed state — demanding states of it would recurse.
+  if (canvas.metadata?.variant) return { result: { score: 100, issues: [] } };
+
+  const inv = extractInventory(expandInstances(canvas.root, canvas));
+  const demanded = new Map<string, string>(); // state → noun that demanded it
+  for (const d of COVERAGE_DEMANDS) {
+    if (!d.detect(inv)) continue;
+    for (const state of d.demands) if (!demanded.has(state)) demanded.set(state, d.noun);
+  }
+  const dataBearing = demanded.size > 0;
+  const missing = [...demanded.keys()].filter((s) => !designedStates.includes(s));
+  const issues: EvaluationIssue[] = missing.map((state) => ({
+    category: 'coverage',
+    severity: 'warning',
+    nodeId: canvas.root.id,
+    message: `This screen has ${demanded.get(state)} but no "${state}" state variant is designed — the shipped UI will improvise it.`,
+    suggestion: COVERAGE_HINTS[state],
+  }));
+  return {
+    result: { score: Math.max(0, 100 - missing.length * 35), issues },
+    report: { dataBearing, states: designedStates, missing },
+  };
+}
 
 export async function evaluateCanvas(
   canvas: Canvas,
-  options: { mode: 'fast' | 'detailed' | 'llm'; categories?: string[]; genre?: string },
+  options: { mode: 'fast' | 'detailed' | 'llm'; categories?: string[]; genre?: string; designedStates?: string[] },
 ): Promise<EvaluationResult> {
   // Resolve variables so $tokens become actual values for contrast checks.
   // Tokens flow through workspace → project → canvas inheritance (Phase 9),
@@ -1349,6 +1407,13 @@ export async function evaluateCanvas(
       results.set('consistency', checkConsistency(entries));
     }
   }
+  let coverageReport: EvaluationResult['coverage'];
+  if (activeCategories.includes('coverage')) {
+    const { result, report } = checkCoverage(canvas, options.designedStates ?? []);
+    results.set('coverage', result);
+    coverageReport = report;
+  }
+
   let genreReport: GenreReport | undefined;
   if (activeCategories.includes('cliche')) {
     // Genre comes from the explicit option, else the Phase 11 provenance stamp.
@@ -1395,6 +1460,7 @@ export async function evaluateCanvas(
     overallScore,
     categories,
     issues: allIssues,
+    ...(coverageReport ? { coverage: coverageReport } : {}),
     ...(genreReport ? { genre: genreReport } : {}),
     summary: generateSummary(overallScore, categories, allIssues),
     stats: {
