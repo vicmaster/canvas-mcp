@@ -469,6 +469,18 @@ Downstream teams use canvases as a design gate, and two incidents from one sessi
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-23-SPEC.md`](docs/specs/PHASE-23-SPEC.md). All slices shipped — Phase 23 complete._
 
+### Phase 24 — Every state, every string (v1.11)
+
+framesmith designs the happy path of a single static frame with ideal data — but real UX quality lives in the empty table, the loading skeleton, the form error, and the name that's too long for its cell. Make screen states first-class (linked variant canvases, one call to clone, viewer chips) with an evaluator that *demands* coverage on data-bearing screens, and make content robustness mechanical (`canvas_stress`: hostile-but-realistic content perturbations → exactly what clipped or overflowed, by node id).
+
+- [ ] Slice A — variants: `metadata.variant` links + `canvas_add_variant` (clone, re-keyed IDs, idMap) + `canvas_list` rollups + viewer state chips
+- [ ] Slice B — loading/empty primitives: `skeleton` node type (token-derived, static in screenshots) + `empty-state` / `skeleton-table` / `skeleton-card` scaffolds
+- [ ] Slice C — coverage teeth: new `coverage` evaluate category — data-bearing screens warn per missing empty/loading (error for forms), directive-blocking
+- [ ] Slice D — stress testing: `src/stress.ts` perturbation engine (long-text / i18n / big-numbers / empty / many) + `computeLayout` overflow capture + `canvas_stress`
+- [ ] Slice E — agent surfaces: "design every state" + "stress before present" in the workflow, GUIDELINES section, discoverability pins
+
+_Full spec-driven breakdown in [`docs/specs/PHASE-24-SPEC.md`](docs/specs/PHASE-24-SPEC.md)._
+
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
