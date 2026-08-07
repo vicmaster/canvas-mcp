@@ -36,7 +36,14 @@ async function main() {
         const preset = getPreset(theme);
         if (preset) canvas.variables = structuredClone(preset.variables);
       }
-      const ev = await evaluateCanvas(canvas, { mode: 'fast', genre: theme === 'default' ? undefined : theme });
+      // The gate measures the PATTERN's taste/craft — coverage (Phase 24)
+      // demands sibling state variants, which is a property of a designed
+      // screen in a project, not of a scaffold stamped onto a bare canvas.
+      const ev = await evaluateCanvas(canvas, {
+        mode: 'fast',
+        genre: theme === 'default' ? undefined : theme,
+        categories: ['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche'],
+      });
       const tells = ev.issues.filter((i) => i.category === 'cliche');
       const ok = ev.overallScore > BAR && tells.length === 0;
       const detail = ok ? `${ev.overallScore}` : `${ev.overallScore}${tells.length ? ' · tells: ' + tells.map((t) => t.tell).join(', ') : ''}`;

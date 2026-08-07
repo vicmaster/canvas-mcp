@@ -8,7 +8,7 @@
 // Usage: npx tsx test-eval-cache-key.ts
 
 import './test-env.js';
-import { createCanvas } from './src/scene-graph.js';
+import { createCanvas, addVariant } from './src/scene-graph.js';
 import { evalCacheKey } from './src/viewer.js';
 import { parseAndExecute } from './src/operations.js';
 
@@ -50,6 +50,12 @@ check('tree edit → new key', k2 !== k1);
 // Canvas-level token edits move the key (tokens feed contrast/cliché checks).
 canvas.variables = { ...canvas.variables, colors: { accent: '#2563EB' } };
 check('token edit → new key', evalCacheKey(canvas) !== k2);
+
+// Phase 24 slice C — designed state variants feed the coverage check, so
+// adding one must invalidate the BASE canvas's cached evaluation.
+const k3 = evalCacheKey(canvas);
+addVariant(canvas.id, 'empty');
+check('adding a state variant → base key changes', evalCacheKey(canvas) !== k3);
 
 console.log(allPass ? '\nAll eval-cache-key tests passed.' : '\nSOME TESTS FAILED');
 process.exit(allPass ? 0 : 1);

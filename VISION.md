@@ -475,7 +475,7 @@ framesmith designs the happy path of a single static frame with ideal data — b
 
 - [x] Slice A — variants: `metadata.variant` links + `canvas_add_variant` (clone, re-keyed IDs, idMap) + `canvas_list` rollups + viewer state chips
 - [x] Slice B — loading/empty primitives: `skeleton` node type (token-derived, static in screenshots) + `empty-state` / `skeleton-table` / `skeleton-card` scaffolds
-- [ ] Slice C — coverage teeth: new `coverage` evaluate category — data-bearing screens warn per missing empty/loading (error for forms), directive-blocking
+- [x] Slice C — coverage teeth: new `coverage` evaluate category — data-bearing screens warn per missing empty/loading (error for forms), directive-blocking
 - [ ] Slice D — stress testing: `src/stress.ts` perturbation engine (long-text / i18n / big-numbers / empty / many) + `computeLayout` overflow capture + `canvas_stress`
 - [ ] Slice E — agent surfaces: "design every state" + "stress before present" in the workflow, GUIDELINES section, discoverability pins
 
