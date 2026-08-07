@@ -494,6 +494,17 @@ The design-quality cluster's typographic + chromatic half (points 3, 4, 7, 8, 9,
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-25-SPEC.md`](docs/specs/PHASE-25-SPEC.md). All slices shipped — Phase 25 complete. Phase 26 ("Beyond one canvas") takes the cluster's remainder: grid authoring, project-level consistency, multi-screen flow critique._
 
+### Phase 26 — Beyond one canvas (v1.13)
+
+The design-quality cluster's final third (points 5, 6, 12): everything framesmith enforces is per-canvas, but products are SETS of screens. Author real CSS grid (bento/editorial compositions stop being flex approximations), evaluate the project (cross-screen radius/accent/token drift, hand-copied shells, a state-coverage table — advisory; the per-canvas directive stays the only gate), and critique the flow (one multi-image LLM pass scoring navigation/terminology/state-visibility/hierarchy consistency across up to 8 screens).
+
+- [ ] Slice A — grid authoring: `layout: "grid"` + `gridColumns` templates + `gridColumn`/`gridRow` spans + responsive collapse; `bento-grid` rebuilt on real grid
+- [ ] Slice B — `project_evaluate`: per-screen roll-up + cross-screen checks (radius/accent drift, token-adoption outliers, hand-copied chrome → create_component path, coverage table)
+- [ ] Slice C — flow critique: `judgeFlow` multi-image rubric (mode "llm", capped + skipped-reported, stub-testable)
+- [ ] Slice D — agent surfaces: grid vocabulary + "finish the module with project_evaluate" + discoverability pins
+
+_Full spec-driven breakdown in [`docs/specs/PHASE-26-SPEC.md`](docs/specs/PHASE-26-SPEC.md)._
+
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
