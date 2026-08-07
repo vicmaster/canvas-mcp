@@ -90,7 +90,7 @@ function stat(id: string, icon = 'activity'): SceneNode {
     strokeWidth: 1,
     children: [
       { id: `${id}-icon`, type: 'icon', icon, iconSize: 24, iconColor: COLOR.accent },
-      { id: `${id}-value`, type: 'text', content: 'Metric — to confirm', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center' },
+      { id: `${id}-value`, type: 'text', content: 'Metric — to confirm', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', textOverflow: 'ellipsis' },
       { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 14, color: COLOR.textSecondary, textAlign: 'center' },
     ],
   };
@@ -111,7 +111,7 @@ function navItem(id: string, label: string, icon = 'circle'): SceneNode {
     fill: COLOR.bgElevated,
     children: [
       { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: COLOR.textSecondary },
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, color: COLOR.textSecondary },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
     ],
   };
 }

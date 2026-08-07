@@ -96,6 +96,12 @@ export interface SceneNode {
   cornerRadius?: number | [number, number, number, number];
   opacity?: number;
   overflow?: 'visible' | 'hidden' | 'auto';
+  /** Designed single-line truncation (text nodes): nowrap + hidden +
+   * text-overflow ellipsis, with min-width 0 so flex rows let it shrink.
+   * canvas_stress reports a clip behind it as info ("designed truncation
+   * engaged"), not a warning — the sanctioned fix for labels that must
+   * survive hostile-length content. */
+  textOverflow?: 'ellipsis';
   shadow?: string;
   shadows?: Array<{
     x: number; y: number; blur: number; spread?: number;

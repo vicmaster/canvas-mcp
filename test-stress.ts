@@ -109,9 +109,48 @@ const rect = (nodeId: string, x: number, y: number, w: number, h: number, extra:
   check('touched node ballooning → exempt', !f6.some((f) => f.kind === 'layout-shift'), JSON.stringify(f6));
   // ancestor of touched exempt too: root grew but contains touched a.
   check('ancestor of touched exempt', !f6.some((f) => f.nodeId === 'root'));
+
+  // stretch-sibling exempt: sidebar follows the row's growth (same width,
+  // height growth ≤ parent growth) next to a touched, growing content column.
+  const baseS = [rect('root', 0, 0, 800, 600, {}, [rect('row', 0, 0, 800, 500, {}, [
+    rect('sidebar', 0, 0, 200, 500), rect('content', 200, 0, 600, 500, {}, [rect('tbl', 200, 0, 600, 480)])])])];
+  const grownS = [rect('root', 0, 0, 800, 1500, {}, [rect('row', 0, 0, 800, 1400, {}, [
+    rect('sidebar', 0, 0, 200, 1400), rect('content', 200, 0, 600, 1400, {}, [rect('tbl', 200, 0, 600, 1380)])])])];
+  const f7 = compareLayouts(baseS, grownS, ['tbl'], 800);
+  check('stretch-sibling following parent growth → exempt', !f7.some((f) => f.kind === 'layout-shift' && f.nodeId === 'sidebar'), JSON.stringify(f7));
+  // ...but a sibling growing MORE than its parent still flags.
+  const balloonS = [rect('root', 0, 0, 800, 1500, {}, [rect('row', 0, 0, 800, 1400, {}, [
+    rect('sidebar', 0, 0, 200, 3000), rect('content', 200, 0, 600, 1400, {}, [rect('tbl', 200, 0, 600, 1380)])])])];
+  const f8 = compareLayouts(baseS, balloonS, ['tbl'], 800);
+  check('sibling outgrowing its parent still flags', f8.some((f) => f.kind === 'layout-shift' && f.nodeId === 'sidebar'), JSON.stringify(f8));
+
+  // root vertical clip = the page outgrowing its artboard → info, not warning.
+  const rootClipBase = [rect('root', 0, 0, 800, 600, { scrollHeight: 600, clientHeight: 600 })];
+  const rootClipPert = [rect('root', 0, 0, 800, 600, { scrollHeight: 1400, clientHeight: 600 })];
+  const f9 = compareLayouts(rootClipBase, rootClipPert, [], 800);
+  check('page outgrowing fixed artboard → info clip', f9.some((f) => f.kind === 'clip' && f.nodeId === 'root' && f.severity === 'info'), JSON.stringify(f9));
+  // horizontal root clip stays a warning.
+  const rootWideBase = [rect('root', 0, 0, 800, 600, { scrollWidth: 800, clientWidth: 800 })];
+  const rootWidePert = [rect('root', 0, 0, 800, 600, { scrollWidth: 1200, clientWidth: 800 })];
+  const f10 = compareLayouts(rootWideBase, rootWidePert, [], 800);
+  check('horizontal root clip stays warning', f10.some((f) => f.kind === 'clip' && f.severity === 'warning'), JSON.stringify(f10));
 }
 
 check('perturbation registry names stable', PERTURBATION_NAMES.join(',') === 'long-text,i18n,big-numbers,empty,many');
+
+// ── textOverflow: 'ellipsis' — the designed-truncation property ─────────────
+// computeLayout flags ellipsis from computed style and compareLayouts
+// downgrades those clips to info (tested above); what must hold here is that
+// the node property actually emits the CSS that triggers that path.
+{
+  const { renderToHtml } = await import('./src/renderer.js');
+  const html = renderToHtml({
+    id: 'r', type: 'frame', width: 200, layout: 'horizontal',
+    children: [{ id: 'label', type: 'text', content: 'A very long customer name', textOverflow: 'ellipsis' }],
+  }, 200, 100);
+  check('textOverflow node property emits the ellipsis CSS',
+    html.includes('text-overflow: ellipsis') && html.includes('white-space: nowrap') && html.includes('min-width: 0'));
+}
 
 console.log(allPass ? '\nAll stress tests passed.' : '\nSOME TESTS FAILED');
 process.exit(allPass ? 0 : 1);
