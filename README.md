@@ -272,7 +272,7 @@ R("nodeId", { type: "text", content: "Replaced" })
 
 **Returns** `{ ok, nodeIds, results }`. `nodeIds` maps each bound variable to the node ID it created — e.g. `{ "header": "n_a1b2" }` — so you can target those nodes in later calls (bindings only live within a single call). `results` lists each op's outcome in order. If the call wrote a `fontFamily` nothing can serve yet (not cached, registered, or system/generic), a `Font warnings` content item names it — a cache-only check with no network call, so it's a heads-up, not exhaustive.
 
-**Node types:** `frame`, `text`, `rectangle`, `ellipse`, `image`, `icon`, `path`, `component`, `instance`, `toggle`, `checkbox`, `radio`, `select`, `chart`
+**Node types:** `frame`, `text`, `rectangle`, `ellipse`, `image`, `icon`, `path`, `component`, `instance`, `toggle`, `checkbox`, `radio`, `select`, `chart`, `skeleton` (loading-placeholder block — token-derived neutral fill; pulses subtly in the live viewer, always static in screenshots/exports so diffs stay deterministic; `pulse: false` opts a block out)
 
 **Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"`), `gap`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow`, `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition`, `kind`, `series`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
 
@@ -477,7 +477,7 @@ List available layout structures — named scaffolds you stamp onto a canvas and
 Two kinds:
 
 - **`page`** — whole-page scaffolds stamped once at the canvas root: `marquee-hero`, `bento-grid`, `stat-led`, `editorial-longform`, `split-workbench`, `catalogue`, `dashboard`, `auth`, `pricing`, `settings`, `onboarding`. Each is tagged on four independent axes — `heroTreatment`, `density`, `rhythm`, `alignment` — so you can deliberately vary page shape instead of defaulting to the same layout. Every page scaffold is regression-tested to score **> 95 with zero cliché tells** across all five presets (the pattern library's taste bar), so it's a non-slop starting point you adapt, not boilerplate.
-- **`component`** — reusable fragments stamped under **any** node via `targetId`, repeatably: `data-table` (header + 3 rows with avatar/name/email, role chip, status toggle, actions), `form-field`, `toolbar`, `stat-card`, `toggle-row`. A high-fidelity table costs one stamp instead of ~80 hand-placed nodes.
+- **`component`** — reusable fragments stamped under **any** node via `targetId`, repeatably: `data-table` (header + 3 rows with avatar/name/email, role chip, status toggle, actions), `form-field`, `toolbar`, `stat-card`, `toggle-row`, plus the state scaffolds `empty-state` (icon + title + hint + CTA — an empty screen is a first-run experience, not a void), `skeleton-table` (real header + skeleton rows matching `data-table` geometry, so the loaded table lands without layout shift), and `skeleton-card`. A high-fidelity table costs one stamp instead of ~80 hand-placed nodes.
 
 ### `apply_structure`
 

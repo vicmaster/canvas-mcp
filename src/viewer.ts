@@ -118,7 +118,9 @@ export async function startViewer(port: number): Promise<number> {
         const defaultH = typeof canvas.root.height === 'number' ? canvas.root.height : 900;
         const w = url.searchParams.has('w') ? parseInt(url.searchParams.get('w')!, 10) : defaultW;
         const h = url.searchParams.has('h') ? parseInt(url.searchParams.get('h')!, 10) : defaultH;
-        const html = renderToHtml(resolved, w, h, canvas);
+        // skeletonPulse: the live viewer is the ONE context where skeleton
+        // blocks animate — screenshots/exports/diffs stay static.
+        const html = renderToHtml(resolved, w, h, canvas, { skeletonPulse: true });
         res.setHeader('Content-Type', 'text/html');
         res.end(html);
         return;

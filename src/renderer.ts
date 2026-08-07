@@ -51,6 +51,11 @@ export interface RenderOptions {
   /** Document-default family (Phase 16 — typography.body token). Prepended to
    * the system stack on <body>. */
   bodyFontFamily?: string;
+  /** Phase 24 slice B — emit the skeleton pulse animation. ONLY the live
+   * viewer sets this; screenshots/exports/diffs stay static so consecutive
+   * renders are byte-comparable (canvas_diff / visual baselines never
+   * flicker). */
+  skeletonPulse?: boolean;
 }
 
 // Registered canvas.fonts family names (lowercased) — a generic shorthand
@@ -66,6 +71,14 @@ export function renderToHtml(root: SceneNode, width = 1440, height = 900, canvas
   const registered = registeredFamilies(canvas);
   const body = renderNode(root, canvas, registered);
   const responsiveCss = buildRendererStylesheet(root, canvas);
+  // Phase 24 slice B — the pulse keyframes exist ONLY when the caller opts in
+  // (the live viewer). Without them the fs-skeleton class is inert, so every
+  // screenshot/export/diff render is static and deterministic.
+  const skeletonCss = opts?.skeletonPulse
+    ? `  @keyframes fs-skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  .fs-skeleton { animation: fs-skeleton-pulse 1.6s ease-in-out infinite; }
+`
+    : '';
   // Hoist the root's fill/gradient to <html> so wide viewports show the design
   // background instead of browser-default white on the sidebars.
   const rootBg = rootBackgroundCss(root);
@@ -88,7 +101,7 @@ ${preconnect}<style>
   body { width: 100%; max-width: ${width}px; min-height: ${height}px; margin: 0 auto; overflow-x: hidden; font-family: ${bodyFont}; }
   img { display: block; max-width: 100%; }
   p { overflow-wrap: break-word; word-wrap: break-word; }
-${fontFaceCss}${responsiveCss}
+${fontFaceCss}${responsiveCss}${skeletonCss}
 </style>
 </head>
 <body>
@@ -429,6 +442,7 @@ function renderNode(node: SceneNode, canvas?: Canvas, registered?: ReadonlySet<s
   // Phase 16 — input primitives. Static, deterministic control renders; colors
   // arrive pre-defaulted by resolveVariables (token-aware with neutral
   // fallbacks), so the builders just consume node.fill / stroke / color.
+  if (node.type === 'skeleton') return renderSkeleton(node, dataAttr);
   if (node.type === 'toggle') return renderToggle(node, dataAttr);
   if (node.type === 'checkbox') return renderCheckbox(node, dataAttr);
   if (node.type === 'radio') return renderRadio(node, dataAttr);
@@ -635,6 +649,28 @@ function controlSize(node: SceneNode, defW: number, defH: number): { w: number; 
 
 function controlOpacity(node: SceneNode): string[] {
   return node.opacity !== undefined ? [`opacity: ${node.opacity}`] : [];
+}
+
+// Phase 24 slice B — loading-placeholder block. Leaf node, hand-rolled styles
+// (generic buildStyles doesn't apply); fill arrives pre-defaulted by
+// resolveVariables (skeleton → border → translucent neutral). The fs-skeleton
+// class only animates when the document opted into the pulse keyframes.
+function renderSkeleton(node: SceneNode, dataAttr: string): string {
+  const dim = (v: number | string | undefined, fallback: string): string =>
+    v === undefined ? fallback : typeof v === 'number' ? `${v}px` : v;
+  const radius = node.cornerRadius === undefined
+    ? '6px'
+    : typeof node.cornerRadius === 'number' ? `${node.cornerRadius}px` : String(node.cornerRadius);
+  const cls = node.pulse === false ? '' : ' class="fs-skeleton"';
+  const s = [
+    'flex-shrink: 0',
+    `width: ${dim(node.width, '100%')}`,
+    `height: ${dim(node.height, '12px')}`,
+    `border-radius: ${radius}`,
+    `background-color: ${node.fill}`,
+    ...(node.opacity !== undefined ? [`opacity: ${node.opacity}`] : []),
+  ].join('; ');
+  return `<div${dataAttr}${cls} style="${escapeStyleValue(s)}"></div>`;
 }
 
 function renderToggle(node: SceneNode, dataAttr: string): string {

@@ -910,6 +910,99 @@ const dataTable: Structure = {
   }],
 };
 
+// ── Phase 24 slice B — state scaffolds ──────────────────────────────────────
+// The cheap way to satisfy the coverage demand (slice C): a designed empty
+// state and skeleton loading treatments are one stamp each, not hand-builds.
+
+const emptyState: Structure = {
+  name: 'empty-state',
+  kind: 'component',
+  description: 'A designed empty state: icon, title, one-line hint, primary action. Stamp it where the data would be — an empty screen is a first-run experience, never a bare void.',
+  nodes: [{
+    id: 'es', type: 'frame', name: 'Empty state', width: '100%', layout: 'vertical', alignItems: 'center',
+    gap: 6, padding: [48, 24],
+    children: [
+      { id: 'es-icon', type: 'icon', icon: 'inbox', iconSize: 28, iconColor: COLOR.textSecondary },
+      { id: 'es-title', type: 'text', content: 'Nothing here yet', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
+      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 13, color: COLOR.textSecondary },
+      {
+        id: 'es-cta', type: 'frame', name: 'CTA', layout: 'horizontal', alignItems: 'center', gap: 8,
+        padding: [10, 16], cornerRadius: 8, fill: COLOR.accent, width: 'fit-content',
+        children: [
+          { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: '#FFFFFF' },
+          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 13, fontWeight: 600, color: '#FFFFFF' },
+        ],
+      },
+    ],
+  }],
+};
+
+/** One skeleton row matching the data-table column geometry (40/20/25/15). */
+function skeletonRow(id: string): SceneNode {
+  const cell = (cid: string, width: string, barWidth: string, alignEnd = false): SceneNode => ({
+    id: cid, type: 'frame', width, layout: 'horizontal', ...(alignEnd ? { justifyContent: 'end' as const } : {}),
+    children: [{ id: `${cid}-bar`, type: 'skeleton', width: barWidth, height: 12 }],
+  });
+  return {
+    id, type: 'frame', name: 'Skeleton row', width: '100%', layout: 'horizontal', alignItems: 'center',
+    padding: [14, 16], gap: 16, borderTop: { width: 1, color: COLOR.border },
+    children: [
+      {
+        id: `${id}-identity`, type: 'frame', width: '40%', layout: 'horizontal', alignItems: 'center', gap: 8,
+        children: [
+          { id: `${id}-avatar`, type: 'skeleton', width: 32, height: 32, cornerRadius: 16 },
+          { id: `${id}-name`, type: 'skeleton', width: '55%', height: 12 },
+        ],
+      },
+      cell(`${id}-role`, '20%', '70%'),
+      cell(`${id}-status`, '25%', '45%'),
+      cell(`${id}-actions`, '15%', '40%', true),
+    ],
+  };
+}
+
+const skeletonTable: Structure = {
+  name: 'skeleton-table',
+  kind: 'component',
+  description: 'Loading state for a data table: the real header row plus skeleton rows matching data-table geometry, so the loaded table lands without layout shift. Pulses subtly in the live viewer; always static in screenshots.',
+  nodes: [{
+    id: 'skt', type: 'frame', name: 'Skeleton table', width: '100%', layout: 'vertical',
+    cornerRadius: 12, overflow: 'hidden', fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+    children: [
+      {
+        id: 'skt-header', type: 'frame', name: 'Header', width: '100%', layout: 'horizontal', alignItems: 'center',
+        padding: [8, 16], gap: 16, fill: COLOR.bgElevated,
+        children: [
+          tableHeaderCell('skt-h-identity', 'Name', '40%'),
+          tableHeaderCell('skt-h-role', 'Role', '20%'),
+          tableHeaderCell('skt-h-status', 'Status', '25%'),
+          tableHeaderCell('skt-h-actions', 'Actions', '15%', true),
+        ],
+      },
+      skeletonRow('skt-row1'),
+      skeletonRow('skt-row2'),
+      skeletonRow('skt-row3'),
+      skeletonRow('skt-row4'),
+    ],
+  }],
+};
+
+const skeletonCard: Structure = {
+  name: 'skeleton-card',
+  kind: 'component',
+  description: 'Loading state for a card: media block, title bar, and two text lines as skeletons — same silhouette as the loaded card.',
+  nodes: [{
+    id: 'skc', type: 'frame', name: 'Skeleton card', width: '100%', layout: 'vertical', gap: 12,
+    padding: 16, cornerRadius: 12, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+    children: [
+      { id: 'skc-media', type: 'skeleton', width: '100%', height: 120, cornerRadius: 8 },
+      { id: 'skc-title', type: 'skeleton', width: '60%', height: 14 },
+      { id: 'skc-line1', type: 'skeleton', width: '100%', height: 10 },
+      { id: 'skc-line2', type: 'skeleton', width: '80%', height: 10 },
+    ],
+  }],
+};
+
 const structureMap = new Map<string, Structure>([
   ['marquee-hero', marqueeHero],
   ['bento-grid', bentoGrid],
@@ -928,6 +1021,10 @@ const structureMap = new Map<string, Structure>([
   ['toolbar', toolbar],
   ['stat-card', statCard],
   ['toggle-row', toggleRow],
+  // Phase 24 slice B — state scaffolds
+  ['empty-state', emptyState],
+  ['skeleton-table', skeletonTable],
+  ['skeleton-card', skeletonCard],
 ]);
 
 export function listStructures(): { name: string; kind: 'page' | 'component'; description: string; axes?: StructureAxes }[] {
