@@ -45,8 +45,19 @@ export interface SceneNode {
   height?: number | string;
   minWidth?: number | string;
   maxWidth?: number | string;
-  layout?: 'horizontal' | 'vertical' | 'none';
+  layout?: 'horizontal' | 'vertical' | 'grid' | 'none';
   gap?: number;
+  /** grid only (Phase 26 slice A) — row-axis gap override; `gap` covers both
+   * axes otherwise. */
+  rowGap?: number;
+  /** grid container — the column template: a count (3 → three equal columns),
+   * an array of fr weights and/or CSS lengths ([2, 1, "240px"]), or a raw
+   * template string (sanitized; unsafe values fall back to equal columns). */
+  gridColumns?: number | (number | string)[] | string;
+  /** grid children — cell placement: a number means "span N"; strings accept
+   * "span N" or "a / b" line syntax. */
+  gridColumn?: number | string;
+  gridRow?: number | string;
   padding?: number | [number, number] | [number, number, number, number];
   alignItems?: 'start' | 'center' | 'end' | 'stretch';
   justifyContent?: 'start' | 'center' | 'end' | 'space-between' | 'space-around';
