@@ -105,7 +105,9 @@ export interface SceneNode {
 
   // Text
   content?: string;
-  fontSize?: number;
+  /** px number, or a CSS length expression string (e.g. the clamp() forms
+   * generate_scale emits in fluid mode). */
+  fontSize?: number | string;
   fontFamily?: string;
   fontWeight?: number | string;
   color?: string;
@@ -200,7 +202,7 @@ export interface DesignVariables {
   colors?: Record<string, string>;
   spacing?: Record<string, number>;
   radius?: Record<string, number>;
-  typography?: Record<string, { fontSize: number; fontWeight?: string | number; fontFamily?: string; lineHeight?: number | string; letterSpacing?: number }>;
+  typography?: Record<string, { fontSize: number | string; fontWeight?: string | number; fontFamily?: string; lineHeight?: number | string; letterSpacing?: number }>;
 }
 
 /** Custom font face declaration. Renderer emits a single `@font-face` rule
