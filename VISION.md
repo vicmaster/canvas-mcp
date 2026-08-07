@@ -490,9 +490,9 @@ The design-quality cluster's typographic + chromatic half (points 3, 4, 7, 8, 9,
 - [x] Slice C — `src/color-system.ts` + `generate_color_system`: one seed → OKLCH ramps 50–900, matched neutral, status colors, semantic mapping
 - [x] Slice D — dual theme: sparse `dark` token layer, theme param on render/evaluate/viewer, both-mode contrast + APCA info
 - [x] Slice E — token-detachment lint (literal = token → $ref autofix) + motion token category
-- [ ] Slice F — agent surfaces: "derive, don't hand-pick" workflow + discoverability pins
+- [x] Slice F — agent surfaces: "derive, don't hand-pick" workflow + discoverability pins
 
-_Full spec-driven breakdown in [`docs/specs/PHASE-25-SPEC.md`](docs/specs/PHASE-25-SPEC.md). Phase 26 ("Beyond one canvas") takes the cluster's remainder: grid authoring, project-level consistency, multi-screen flow critique._
+_Full spec-driven breakdown in [`docs/specs/PHASE-25-SPEC.md`](docs/specs/PHASE-25-SPEC.md). All slices shipped — Phase 25 complete. Phase 26 ("Beyond one canvas") takes the cluster's remainder: grid authoring, project-level consistency, multi-screen flow critique._
 
 ### Issue-driven improvements (post-v1.8)
 

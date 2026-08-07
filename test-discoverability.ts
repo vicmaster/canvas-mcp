@@ -191,6 +191,33 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── 10. Phase 25 vocabulary is surfaced where agents look ────────────────────
+// The generators' emitted names (ratio names, semantic color tokens), the
+// theme parameter, and the motion-token prefix must stay documented — a
+// generated vocabulary nobody can discover is a private language.
+{
+  const { RATIO_NAMES } = await import('./src/scales.js');
+  expect('ratio names found', RATIO_NAMES.length >= 6, RATIO_NAMES.join(', '));
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    const missing = RATIO_NAMES.filter((r: string) => !surface[1].includes(r));
+    expect(`every ratio name in ${surface[0]}`, missing.length === 0, missing.join(', '));
+  }
+
+  const { generateColorSystem } = await import('./src/color-system.js');
+  const semanticNames = Object.keys(generateColorSystem('#2563EB').light);
+  expect('semantic token names found', semanticNames.length >= 7, semanticNames.join(', '));
+  for (const surface of [['src/index.ts', indexSrc], ['README', readme]] as const) {
+    const missing = semanticNames.filter((n) => !surface[1].includes(n));
+    expect(`every semantic token name in ${surface[0]}`, missing.length === 0, missing.join(', '));
+  }
+
+  for (const concept of ['theme', 'dark.colors', '$motion', 'APCA']) {
+    for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+      expect(`"${concept}" documented in ${surface[0]}`, surface[1].includes(concept));
+    }
+  }
+}
+
 let allPass = true;
 for (const c of checks) {
   if (!c.ok) allPass = false;
