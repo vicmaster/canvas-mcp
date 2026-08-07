@@ -303,19 +303,22 @@ const bentoGrid: Structure = {
           ],
         },
         {
+          // Phase 26 slice A — real CSS grid: a 4-column template with spans
+          // gives the asymmetric bento rhythm the flex-wrap approximation
+          // could only fake; responsive: "stack" collapses it on mobile.
           id: 'bn-grid',
           type: 'frame',
           name: 'Bento grid',
-          layout: 'horizontal',
-          wrap: true,
-          responsive: 'wrap',
+          layout: 'grid',
+          gridColumns: 4,
           gap: 24,
+          responsive: 'stack',
           children: [
-            card('bn-card-1', 'Feature card — primary', 560, 280, COLOR.bgSurface),
-            card('bn-card-2', 'Card — supporting', 300, 280, COLOR.bgSurface),
-            card('bn-card-3', 'Card — metric', 280, 200, COLOR.bgElevated, 'Metric — to confirm'),
-            card('bn-card-4', 'Card — supporting', 280, 200, COLOR.bgSurface),
-            card('bn-card-5', 'Card — wide', 580, 200, COLOR.bgSurface),
+            { ...card('bn-card-1', 'Feature card — primary', 560, 280, COLOR.bgSurface), width: '100%', gridColumn: 3 },
+            { ...card('bn-card-2', 'Card — supporting', 300, 280, COLOR.bgSurface), width: '100%' },
+            { ...card('bn-card-3', 'Card — metric', 280, 200, COLOR.bgElevated, 'Metric — to confirm'), width: '100%' },
+            { ...card('bn-card-4', 'Card — supporting', 280, 200, COLOR.bgSurface), width: '100%' },
+            { ...card('bn-card-5', 'Card — wide', 580, 200, COLOR.bgSurface), width: '100%', gridColumn: 2 },
           ],
         },
       ],

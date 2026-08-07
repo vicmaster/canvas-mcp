@@ -35,11 +35,11 @@ Pick the right `width` per node — this is the single biggest lever for respons
 
 ## Responsive hints
 
-Set `responsive` on **container nodes** (frames with `layout: "horizontal"` and children). The renderer emits the right media-query / flex-wrap rules.
+Set `responsive` on **container nodes** (frames with `layout: "horizontal"` or `layout: "grid"` and children). The renderer emits the right media-query rules — flex-wrap for horizontal containers, a single-column collapse with spans reset for grid.
 
 | Hint | Effect | Use when |
 |---|---|---|
-| `responsive: "stack"` | Horizontal container flips to vertical below 768px | Multi-column rows that should become a single column on mobile. **This is the most common case** — almost every card row, hero with side-by-side panels, footer link group |
+| `responsive: "stack"` | Horizontal container flips to vertical below 768px; a `grid` container collapses to one column (spans reset) | Multi-column rows that should become a single column on mobile. **This is the most common case** — almost every card row, hero with side-by-side panels, footer link group |
 | `responsive: "wrap"` | Children wrap to the next line instead of overflowing | Tag clouds, badge groups, card grids that can have an irregular last row |
 | `responsive: "fixed"` | Never reflows | Toolbars, navbars, fixed-position headers — anywhere reflow would break the layout intent |
 
@@ -67,6 +67,17 @@ img=I(hero, { type: "image", src: "...", width: "50%" })
 tags=I("document", { type: "frame", layout: "horizontal", gap: 8, responsive: "wrap" })
 // each tag: width: "fit-content", padding: [4, 12], cornerRadius: 999
 ```
+
+**Bento grid** (real CSS grid — spans make the asymmetric rhythm; stacks on mobile):
+
+```js
+grid=I("document", { type: "frame", layout: "grid", gridColumns: 4, gap: 24, responsive: "stack" })
+hero=I(grid, { type: "frame", gridColumn: 3, height: 280, width: "100%", padding: 24, fill: "$bg-surface", cornerRadius: 16 })
+side=I(grid, { type: "frame", height: 280, width: "100%", padding: 24, fill: "$bg-surface", cornerRadius: 16 })
+// ...three more tiles; a gridColumn: 2 tile closes the second row
+```
+
+`gridColumns` takes a count, an array of fr weights / lengths (`[2, 1, "240px"]`), or a template string; a numeric `gridColumn`/`gridRow` means "span N". Prefer grid over nested-flex approximation whenever tiles span columns — the `bento-grid` structure stamps this shape ready-made.
 
 **Toolbar** (never reflows):
 

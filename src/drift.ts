@@ -105,6 +105,10 @@ const CONTROL_TYPES = new Set(['toggle', 'checkbox', 'radio', 'select']);
  * are ignored when counting rows. */
 function detectTable(node: SceneNode): { columnCount: number; headers: string[]; rowCount: number } | null {
   if (node.type !== 'frame' || !node.children || node.children.length < 2) return null;
+  // Phase 26 slice A — a grid container is a COMPOSITION, never a table:
+  // bento tiles with inner structure would otherwise pattern-match as
+  // rows-of-cells (drift/coverage/stress all share this detector).
+  if (node.layout === 'grid') return null;
   const rows = node.children.filter((c) => c.type === 'frame' && (c.children?.length ?? 0) >= 2);
   if (rows.length < 2) return null;
   const named = node.name === 'Table';

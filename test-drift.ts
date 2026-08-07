@@ -72,6 +72,16 @@ check('structural: words survive', !isDataLike('STATUS') && !isDataLike('Rename'
   check('table subtree consumed (no cell texts leak)', inv.texts.length === 0, JSON.stringify(inv.texts.map((t) => t.display)));
 }
 
+{
+  // Phase 26 slice A — grid containers are compositions, never tables (the
+  // detector is shared with coverage and stress).
+  const inv = extractInventory(doc([frame([
+    frame([text('REVENUE'), text('Details')]),
+    frame([text('GROWTH'), text('Details')]),
+  ], { layout: 'grid' } as never)]));
+  check('grid container never reads as a table', inv.tables.length === 0);
+}
+
 // ── identical trees → in sync, zero findings ────────────────────────────────
 {
   const make = () => doc([text('Stream types'), table(['NAME', 'TYPE'], [['Live', 'video']]), frame([text('Enabled'), control('toggle')])]);

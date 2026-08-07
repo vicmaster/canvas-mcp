@@ -124,6 +124,35 @@ const ALLOWED_EASINGS = new Set(['ease', 'ease-in', 'ease-out', 'ease-in-out', '
 const SAFE_CUBIC_BEZIER = /^cubic-bezier\(\s*-?[\d.]+\s*,\s*-?[\d.]+\s*,\s*-?[\d.]+\s*,\s*-?[\d.]+\s*\)$/;
 const CSS_IDENT = /^[a-zA-Z][a-zA-Z0-9-]*$/;
 
+// Phase 26 slice A — grid template + placement sanitization. Entries and
+// templates that fail the safe shapes are replaced with equal columns /
+// dropped — never escaped, never injected (house policy).
+const SAFE_GRID_ENTRY = /^([\d.]+(px|fr|%|em|rem)|auto|min-content|max-content|minmax\([\d.]+(px|fr|%|em|rem)?\s*,\s*[\d.]+(px|fr|%|em|rem)?\))$/;
+const SAFE_GRID_TEMPLATE = /^[\w\s(),.%-]+$/;
+const SAFE_GRID_PLACEMENT = /^(span\s+\d+|\d+(\s*\/\s*(span\s+)?-?\d+)?)$/;
+
+/** Normalize gridColumns to a safe grid-template-columns value. minmax(0, Nfr)
+ * instead of bare Nfr so long content can't blow a track past its share. */
+function gridTemplateValue(cols: SceneNode['gridColumns'], childCount: number): string {
+  const equal = (n: number): string => `repeat(${Math.max(1, Math.round(n))}, minmax(0, 1fr))`;
+  if (cols === undefined) return equal(Math.max(1, childCount));
+  if (typeof cols === 'number') return equal(cols);
+  if (Array.isArray(cols)) {
+    const entries = cols.map((c) => (typeof c === 'number' ? `minmax(0, ${c}fr)` : c.trim()));
+    const allSafe = cols.every((c, i) => typeof c === 'number' || SAFE_GRID_ENTRY.test(entries[i]));
+    return allSafe && entries.length > 0 ? entries.join(' ') : equal(cols.length || childCount);
+  }
+  return SAFE_GRID_TEMPLATE.test(cols.trim()) ? cols.trim() : equal(childCount);
+}
+
+/** Normalize gridColumn/gridRow: a number means "span N". Unsafe → null. */
+function gridPlacementValue(v: number | string | undefined): string | null {
+  if (v === undefined) return null;
+  if (typeof v === 'number') return Number.isInteger(v) && v > 0 ? `span ${v}` : null;
+  const t = v.trim();
+  return SAFE_GRID_PLACEMENT.test(t) ? t : null;
+}
+
 // Permissive but escape-proof: allow standard SVG path data chars
 // (letters that name commands, digits, dots, signs, whitespace, commas)
 // while rejecting anything that could break out of the attribute or inject
@@ -519,7 +548,10 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
   if (node.height !== undefined) s.push(`height: ${cssLength(node.height)}`);
 
   // Layout
-  if (node.layout === 'horizontal') {
+  if (node.layout === 'grid') {
+    s.push('display: grid', `grid-template-columns: ${gridTemplateValue(node.gridColumns, node.children?.length ?? 1)}`);
+    if (node.rowGap !== undefined) s.push(`row-gap: ${node.rowGap}px`);
+  } else if (node.layout === 'horizontal') {
     s.push('display: flex', 'flex-direction: row');
   } else if (node.layout === 'vertical') {
     s.push('display: flex', 'flex-direction: column');
@@ -536,6 +568,10 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
   if (node.wrap || node.responsive === 'wrap') s.push('flex-wrap: wrap');
   if (node.alignItems) s.push(`align-items: ${cssFlexAlign(node.alignItems)}`);
   if (node.justifyContent) s.push(`justify-content: ${cssFlexJustify(node.justifyContent)}`);
+  const gridCol = gridPlacementValue(node.gridColumn);
+  if (gridCol) s.push(`grid-column: ${gridCol}`);
+  const gridRow = gridPlacementValue(node.gridRow);
+  if (gridRow) s.push(`grid-row: ${gridRow}`);
 
   // Padding
   if (node.padding !== undefined) {
@@ -796,9 +832,10 @@ export function isValidKeyframeName(name: string): name is keyof typeof KEYFRAME
 
 function buildRendererStylesheet(root: SceneNode, canvas?: Canvas): string {
   const stackIds: string[] = [];
+  const gridStackIds: string[] = [];
   const relativeIds = new Set<string>();
   const keyframes = new Set<string>();
-  collectRendererHints(root, [], canvas, stackIds, relativeIds, keyframes);
+  collectRendererHints(root, [], canvas, stackIds, gridStackIds, relativeIds, keyframes);
 
   const parts: string[] = [];
 
@@ -825,6 +862,16 @@ function buildRendererStylesheet(root: SceneNode, canvas?: Canvas): string {
   }`);
   }
 
+  if (gridStackIds.length > 0) {
+    // Grid collapse: one column, spans reset — same !important rationale.
+    const sel = gridStackIds.map((id) => `[data-node-id="${id}"]`).join(', ');
+    const childSel = gridStackIds.map((id) => `[data-node-id="${id}"] > *`).join(', ');
+    parts.push(`  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    ${sel} { grid-template-columns: minmax(0, 1fr) !important; }
+    ${childSel} { grid-column: auto !important; grid-row: auto !important; }
+  }`);
+  }
+
   return parts.join('\n');
 }
 
@@ -833,6 +880,7 @@ function collectRendererHints(
   ancestors: SceneNode[],
   canvas: Canvas | undefined,
   stackIds: string[],
+  gridStackIds: string[],
   relativeIds: Set<string>,
   keyframes: Set<string>,
 ): void {
@@ -843,6 +891,11 @@ function collectRendererHints(
 
   if (resolved.responsive === 'stack' && resolved.layout === 'horizontal') {
     stackIds.push(resolved.id);
+  }
+  // Phase 26 slice A — a grid with responsive: "stack" collapses to a single
+  // column on mobile (spans reset so tiles flow naturally).
+  if (resolved.responsive === 'stack' && resolved.layout === 'grid') {
+    gridStackIds.push(resolved.id);
   }
 
   if (resolved.animation?.name && isValidKeyframeName(resolved.animation.name)) {
@@ -862,7 +915,7 @@ function collectRendererHints(
   if (resolved.children) {
     const nextAncestors = [...ancestors, resolved];
     for (const child of resolved.children) {
-      collectRendererHints(child, nextAncestors, canvas, stackIds, relativeIds, keyframes);
+      collectRendererHints(child, nextAncestors, canvas, stackIds, gridStackIds, relativeIds, keyframes);
     }
   }
 }
