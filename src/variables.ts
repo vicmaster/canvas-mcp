@@ -57,6 +57,13 @@ const CONTROL_FALLBACK = { accent: '#2563EB', border: '#D1D5DB', surface: '#FFFF
 
 function applyControlDefaults(node: SceneNode, v: DesignVariables): void {
   const t = node.type;
+  if (t === 'skeleton') {
+    // Phase 24 slice B — loading placeholder: a themed canvas picks up its
+    // own border tone (or an explicit `skeleton` token); unthemed canvases
+    // get a translucent neutral that reads on light AND dark surfaces.
+    if (node.fill === undefined) node.fill = v.colors?.skeleton ?? v.colors?.border ?? 'rgba(127, 127, 127, 0.22)';
+    return;
+  }
   if (t !== 'toggle' && t !== 'checkbox' && t !== 'radio' && t !== 'select') return;
 
   const accent = v.colors?.accent ?? v.colors?.primary ?? CONTROL_FALLBACK.accent;

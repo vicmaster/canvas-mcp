@@ -1,6 +1,9 @@
 export type NodeType = 'frame' | 'text' | 'rectangle' | 'ellipse' | 'image' | 'icon' | 'component' | 'instance' | 'document' | 'path'
   // Phase 16 — input primitives: static, token-styled control renders.
   | 'toggle' | 'checkbox' | 'radio' | 'select'
+  // Phase 24 slice B — loading-placeholder block (token-derived neutral;
+  // pulses only in the live viewer, static in screenshots/exports/diffs).
+  | 'skeleton'
   // Phase 22 slice F — data-driven chart (line/bar): the node does the
   // value→coordinate math, so a chart edit is a data edit.
   | 'chart';
@@ -135,6 +138,9 @@ export interface SceneNode {
   disabled?: boolean;
   /** select only: the displayed value; absent renders a muted placeholder. */
   value?: string;
+  /** skeleton only: set false to opt a block out of the live-viewer pulse.
+   * Screenshots/exports/diffs are ALWAYS static regardless (determinism). */
+  pulse?: boolean;
 
   // SVG path (only for type: 'path'). Inherits fill/stroke/strokeWidth from
   // the standard SceneNode fields; viewBox defaults to `0 0 width height`.
