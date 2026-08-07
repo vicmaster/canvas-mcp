@@ -213,3 +213,153 @@ export function parseRubric(text: string): Omit<LLMJudgeResult, 'provider' | 'mo
     suggestions: asStringArray(rec.suggestions),
   };
 }
+
+// ── Phase 26 slice C — the multi-screen FLOW critique ───────────────────────
+// One judge call over a screen SET, scoring qualities that only exist across
+// screens (the Nielsen-heuristic layer a single screenshot can't show).
+// Same provider table pattern, same fixed-rubric parsing contract, same
+// graceful no-key behavior — and the same actionability rule: every note
+// names the screen it's about.
+
+export const FLOW_AXES = ['navigation-consistency', 'terminology-consistency', 'state-visibility', 'hierarchy-consistency'] as const;
+export type FlowAxis = (typeof FLOW_AXES)[number];
+
+export interface FlowScreenNote {
+  /** One of the screen names provided to the judge — notes that name unknown
+   * screens are dropped in parsing (anchoring must stay honest). */
+  screen: string;
+  note: string;
+}
+
+export interface FlowCritiqueResult {
+  provider: Provider;
+  model: string;
+  rubric: Record<FlowAxis, AxisScore>;
+  /** 0–100, derived: round(mean(axisScores) / 5 * 100). */
+  score: number;
+  summary: string;
+  screenNotes: FlowScreenNote[];
+}
+
+export type FlowScreen = { name: string; png: string };
+export type FlowJudge = (screens: FlowScreen[]) => Promise<FlowCritiqueResult>;
+
+const FLOW_AXIS_GUIDE = `- navigation-consistency: the same navigation appears in the same place with the same items on every screen; the active state moves, the structure doesn't.
+- terminology-consistency: a concept keeps ONE name across screens (no "Members" on one screen becoming "Users" on the next); labels, casing, and iconography agree.
+- state-visibility: every action visible across the flow has a visible result somewhere — status, confirmation, count changes; nothing happens silently.
+- hierarchy-consistency: headings, spacing rhythm, and emphasis follow the same system on every screen; no screen feels like it came from a different product.`;
+
+const FLOW_SYSTEM_PROMPT = `You are a senior product designer reviewing a FLOW — several screens of one product, shown in order. Score each of these four axes from 1 (poor) to 5 (excellent), each with a one-line rationale referencing specific screens BY NAME:
+${FLOW_AXIS_GUIDE}
+
+Output STRICT JSON only — no prose before or after, no markdown fences — matching this schema:
+{
+  "rubric": {
+    "navigation-consistency":  { "score": 1-5, "rationale": string },
+    "terminology-consistency": { "score": 1-5, "rationale": string },
+    "state-visibility":        { "score": 1-5, "rationale": string },
+    "hierarchy-consistency":   { "score": 1-5, "rationale": string }
+  },
+  "summary": string (1-2 sentences about the flow as a whole),
+  "screenNotes": [{ "screen": string (EXACTLY one of the provided screen names), "note": string (one concrete, actionable observation) }]
+}
+Reference only what is visible. Use the provided screen names exactly.`;
+
+export function parseFlowRubric(text: string, screenNames: string[]): Omit<FlowCritiqueResult, 'provider' | 'model'> {
+  const cleaned = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  let obj: unknown;
+  try {
+    obj = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(`LLM did not return valid JSON: ${(err as Error).message}. Raw output: ${text.slice(0, 200)}`);
+  }
+  if (!obj || typeof obj !== 'object') throw new Error('LLM response was not a JSON object.');
+  const rec = obj as Record<string, unknown>;
+  const rawRubric = (rec.rubric ?? {}) as Record<string, unknown>;
+
+  const rubric = {} as Record<FlowAxis, AxisScore>;
+  for (const axis of FLOW_AXES) {
+    const entry = (rawRubric[axis] ?? {}) as Record<string, unknown>;
+    rubric[axis] = {
+      score: clampAxis(entry.score),
+      rationale: typeof entry.rationale === 'string' ? entry.rationale : '',
+    };
+  }
+  const mean = FLOW_AXES.reduce((s, a) => s + rubric[a].score, 0) / FLOW_AXES.length;
+
+  const known = new Set(screenNames);
+  const screenNotes: FlowScreenNote[] = (Array.isArray(rec.screenNotes) ? rec.screenNotes : [])
+    .filter((n): n is { screen: string; note: string } =>
+      !!n && typeof (n as Record<string, unknown>).screen === 'string' && typeof (n as Record<string, unknown>).note === 'string')
+    .filter((n) => known.has(n.screen));
+
+  return {
+    rubric,
+    score: Math.round((mean / 5) * 100),
+    summary: typeof rec.summary === 'string' ? rec.summary : '',
+    screenNotes,
+  };
+}
+
+/** Interleave "Screen: <name>" labels with images so the judge can anchor
+ * notes to names — the shape both providers accept. */
+async function flowWithAnthropic(screens: FlowScreen[]): Promise<FlowCritiqueResult> {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic();
+  const model = process.env.FRAMESMITH_LLM_ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+  const content: Array<{ type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: 'image/png'; data: string } }> = [];
+  for (const s of screens) {
+    content.push({ type: 'text', text: `Screen: ${s.name}` });
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: s.png } });
+  }
+  content.push({ type: 'text', text: 'Evaluate this flow against the rubric. Return the JSON object only.' });
+  const response = await client.messages.create({
+    model,
+    max_tokens: 1500,
+    system: FLOW_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content }],
+  });
+  const text = response.content
+    .filter((b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text')
+    .map((b) => b.text)
+    .join('');
+  return { provider: 'anthropic', model, ...parseFlowRubric(text, screens.map((s) => s.name)) };
+}
+
+async function flowWithOpenAI(screens: FlowScreen[]): Promise<FlowCritiqueResult> {
+  const { default: OpenAI } = await import('openai');
+  const client = new OpenAI();
+  const model = process.env.FRAMESMITH_LLM_OPENAI_MODEL ?? 'gpt-4.1';
+  const content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [];
+  for (const s of screens) {
+    content.push({ type: 'text', text: `Screen: ${s.name}` });
+    content.push({ type: 'image_url', image_url: { url: `data:image/png;base64,${s.png}` } });
+  }
+  content.push({ type: 'text', text: 'Evaluate this flow against the rubric. Return the JSON object only.' });
+  const response = await client.chat.completions.create({
+    model,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: FLOW_SYSTEM_PROMPT },
+      { role: 'user', content },
+    ],
+  });
+  const text = response.choices[0]?.message?.content ?? '';
+  return { provider: 'openai', model, ...parseFlowRubric(text, screens.map((s) => s.name)) };
+}
+
+export const flowJudges: Record<Provider, FlowJudge> = {
+  anthropic: flowWithAnthropic,
+  openai: flowWithOpenAI,
+};
+
+export async function judgeFlow(screens: FlowScreen[], opts: { provider?: Provider } = {}): Promise<FlowCritiqueResult> {
+  if (screens.length < 2) throw new Error('judgeFlow needs at least 2 screens — flow qualities do not exist on one.');
+  const provider = opts.provider ?? pickProvider();
+  if (!provider) {
+    throw new LLMJudgeUnavailableError(
+      'No LLM provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY (or FRAMESMITH_LLM_PROVIDER=anthropic|openai to pick one explicitly).',
+    );
+  }
+  return flowJudges[provider](screens);
+}

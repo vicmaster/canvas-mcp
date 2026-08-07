@@ -30,7 +30,7 @@ import { generateColorSystem } from './color-system.js';
 import { evaluateProject } from './project-evaluate.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
 import { evaluateCanvas, relaxedByGenre, knownGenres } from './evaluate.js';
-import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
+import { judgeCanvas, judgeFlow, LLMJudgeUnavailableError } from './llm-judge.js';
 import { reviseCanvas } from './reviser.js';
 import { stampCritique, runReviseLoop } from './critique.js';
 import type { Canvas, DesignVariables, FontFace, SceneNode } from './types.js';
@@ -1813,7 +1813,7 @@ server.tool(
   - "llm": fast-mode heuristics plus a vision-model critique against a FIXED rubric (provider picked from FRAMESMITH_LLM_PROVIDER env var, or whichever of ANTHROPIC_API_KEY / OPENAI_API_KEY is set). Adds an "llmCritique" field: { rubric: { hierarchy, execution, specificity, restraint, variety } each {score 1-5, rationale}, score (0-100 derived), summary, suggestions, needsRevision, failingAxes }. The verdict is stamped on the canvas (metadata.critique) + the per-project build log for auditability. Cost: one paid API call per invocation. To CLOSE the loop and auto-fix failing axes, use canvas_revise.
 Designed for generator-evaluator loops: generate with batch_design, evaluate with canvas_evaluate, fix issues targeting the returned nodeIds (canvas_autofix handles the mechanical subset). The result includes a "directive" field — a present/keep-working verdict: resolve EVERY comment and clear > 95 before showing the design to the user; the directive tells you when it's safe to present. An "openFeedback" field (when > 0) counts the user's open point-and-tell comments — they block presenting even at a READY score; read them with get_feedback and close them with resolve_feedback.
 
-THE HEURISTIC DIRECTIVE IS THE PRESENTATION GATE. mode: "llm" adds optional depth (a vision-model rubric critique — composition, hierarchy, polish) on top; it requires an ANTHROPIC_API_KEY or OPENAI_API_KEY and fails gracefully without one — when unavailable, the heuristic directive alone decides. Data-dense screens: pass genre: "dashboard" so the design's own realistic figures aren't flagged as fabricated (see the genre param).
+THE HEURISTIC DIRECTIVE IS THE PRESENTATION GATE. mode: "llm" adds optional depth (a vision-model rubric critique — composition, hierarchy, polish) on top; it requires an ANTHROPIC_API_KEY or OPENAI_API_KEY and fails gracefully without one — the FULL heuristic result still returns with an llmNote explaining what's missing, and the heuristic directive alone decides. Data-dense screens: pass genre: "dashboard" so the design's own realistic figures aren't flagged as fabricated (see the genre param).
 
 The result's "genre" field (present whenever cliche ran) makes the genre decision auditable: { active, source ("explicit" param | "provenance" stamp | null), relaxed (tells skipped), notRelaxed ([{ tell, relaxedBy }] — tells still flagging that a DIFFERENT genre would relax) }. If the score is pinned by tells listed in notRelaxed, the genre is probably wrong — genre follows what the screen is FOR (read screens with published figures → "dashboard"; editors/admin forms → "material"), not what it contains.`,
   {
@@ -1837,6 +1837,7 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
     const designedStates = listCanvases().find((r) => r.id === canvasId)?.variants?.map((v) => v.state) ?? [];
     const result = await evaluateCanvas(canvas, { mode, categories, genre, designedStates });
 
+    let llmNote: string | undefined;
     if (mode === 'llm') {
       try {
         const { resolved, renderOpts } = await prepareRender(canvas);
@@ -1849,10 +1850,14 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
         stampCritique(canvas, critique);
         touchCanvas(canvasId);
       } catch (err) {
-        const msg = err instanceof LLMJudgeUnavailableError
-          ? err.message
-          : `LLM critique failed: ${(err as Error).message}`;
-        return { content: [{ type: 'text', text: msg }], isError: true };
+        // Phase 26 slice C — keyless alignment with project_evaluate: a
+        // missing provider degrades to a NOTE on the full heuristic result
+        // (the directive alone decides); only real API failures error.
+        if (err instanceof LLMJudgeUnavailableError) {
+          llmNote = `LLM critique unavailable: ${err.message} The heuristic result stands alone.`;
+        } else {
+          return { content: [{ type: 'text', text: `LLM critique failed: ${(err as Error).message}` }], isError: true };
+        }
       }
     }
 
@@ -1875,7 +1880,7 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
     const directive = appendFeedbackDirective(baseDirective, openFeedback);
 
     return {
-      content: [{ type: 'text', text: JSON.stringify({ ...result, ...(openFeedback > 0 ? { openFeedback } : {}), directive }, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify({ ...result, ...(llmNote ? { llmNote } : {}), ...(openFeedback > 0 ? { openFeedback } : {}), directive }, null, 2) }],
     };
   }
 );
@@ -2029,12 +2034,15 @@ server.tool(
 
 Cross-screen findings (each names its evidence — which canvases, which values): radius-drift (a screen whose corner-radius set shares nothing with the project's common scale), accent-drift (an accent hue > 30° from the project's dominant one), token-adoption (a screen styling by hand while the rest reference tokens), copied-chrome (the same substantial top-level shape hand-copied on 2+ screens instead of component instances — the create_component + copy_nodes path is named), and state-coverage (the aggregated missing empty/loading/error table).
 
-THIS IS ADVISORY, NOT A GATE. Only the per-canvas directives (canvas_evaluate score, coverage, feedback) gate presenting — this roll-up reviews coherence and points at fixes; it never blocks. Variant canvases are excluded from the rows (they'd double-count screens) and feed their base's states column instead. Chrome-free, no API key.`,
+THIS IS ADVISORY, NOT A GATE. Only the per-canvas directives (canvas_evaluate score, coverage, feedback) gate presenting — this roll-up reviews coherence and points at fixes; it never blocks. Variant canvases are excluded from the rows (they'd double-count screens) and feed their base's states column instead. The default mode is Chrome-free and needs no API key.
+
+mode: "llm" adds the FLOW CRITIQUE: up to 8 screens are rendered and judged TOGETHER (one multi-image call) against a fixed flow rubric — navigation-consistency, terminology-consistency, state-visibility, hierarchy-consistency — each 1-5 with a rationale, plus per-screen notes naming the canvas. Screens past the cap are listed in flowSkipped (pass canvasIds to pick the flow yourself — nothing is silently dropped). Needs Chrome + an ANTHROPIC_API_KEY or OPENAI_API_KEY; WITHOUT a key the full heuristic roll-up still returns, with a flowNote instead of an error.`,
   {
     projectId: z.string().describe('The project whose screens to roll up'),
     canvasIds: z.array(z.string()).optional().describe('Restrict to these canvases (e.g. the screens of one flow); default: every non-variant canvas in the project'),
+    mode: z.enum(['fast', 'llm']).default('fast').describe('"fast" = heuristic roll-up only (Chrome-free, keyless); "llm" adds the multi-image flow critique (Chrome + API key; degrades to a note without one)'),
   },
-  async ({ projectId, canvasIds }) => {
+  async ({ projectId, canvasIds, mode }) => {
     if (!getProject(projectId)) {
       return { content: [{ type: 'text', text: `Error: Project "${projectId}" not found. Use project_list to see projects.` }], isError: true };
     }
@@ -2050,7 +2058,45 @@ THIS IS ADVISORY, NOT A GATE. Only the per-canvas directives (canvas_evaluate sc
     }
     const statesByCanvas = new Map(rows.map((r) => [r.id, r.variants?.map((v) => v.state) ?? []]));
     const result = await evaluateProject(canvases, statesByCanvas);
-    return { content: [{ type: 'text', text: JSON.stringify({ projectId, ...result }, null, 2) }] };
+
+    // Phase 26 slice C — the flow critique: one multi-image judge call over
+    // up to 8 screens. Any failure (no key, API hiccup) degrades to a note —
+    // the heuristic roll-up is the primary product and always returns.
+    let flowCritique: unknown;
+    let flowSkipped: string[] | undefined;
+    let flowNote: string | undefined;
+    if (mode === 'llm') {
+      const FLOW_CAP = 8;
+      const flowCanvases = canvases.slice(0, FLOW_CAP);
+      flowSkipped = canvases.slice(FLOW_CAP).map((c) => c.name);
+      if (flowCanvases.length < 2) {
+        flowNote = 'Flow critique needs at least 2 screens — flow qualities do not exist on one.';
+      } else {
+        try {
+          const screens = [];
+          for (const c of flowCanvases) {
+            const { resolved, renderOpts } = await prepareRender(c);
+            const w = typeof c.root.width === 'number' ? c.root.width : 1440;
+            const h = typeof c.root.height === 'number' ? c.root.height : 900;
+            const html = renderToHtml(resolved, w, h, c, renderOpts);
+            screens.push({ name: c.name, png: await takeScreenshot(html, { width: w, height: h, scale: 1 }) });
+          }
+          flowCritique = await judgeFlow(screens);
+        } catch (err) {
+          flowNote = err instanceof LLMJudgeUnavailableError
+            ? `Flow critique unavailable: ${err.message} The heuristic roll-up below stands alone.`
+            : `Flow critique failed (${(err as Error).message}) — the heuristic roll-up below stands alone.`;
+        }
+      }
+    }
+
+    return { content: [{ type: 'text', text: JSON.stringify({
+      projectId,
+      ...result,
+      ...(flowCritique ? { flowCritique } : {}),
+      ...(flowSkipped?.length ? { flowSkipped } : {}),
+      ...(flowNote ? { flowNote } : {}),
+    }, null, 2) }] };
   }
 );
 

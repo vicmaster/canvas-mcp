@@ -766,7 +766,7 @@ Whenever the `coverage` category runs on a **base** canvas, the result also carr
 }
 ```
 
-**With `mode: "llm"`** (Phase 13), the vision model scores a **fixed rubric** — five axes, each 1–5 with a rationale — instead of one opaque number. The verdict is stamped on the canvas (`metadata.critique`) and the per-project build log so quality is auditable over time. Add `floor` (1–5, default 3, or `FRAMESMITH_CRITIQUE_FLOOR`) to set the per-axis threshold that trips `needsRevision`.
+**With `mode: "llm"`** (Phase 13), the vision model scores a **fixed rubric** — five axes, each 1–5 with a rationale — instead of one opaque number. The verdict is stamped on the canvas (`metadata.critique`) and the per-project build log so quality is auditable over time. Add `floor` (1–5, default 3, or `FRAMESMITH_CRITIQUE_FLOOR`) to set the per-axis threshold that trips `needsRevision`. **Without an `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, the call doesn't fail** — the full heuristic result still returns with an `llmNote` explaining the critique was skipped, and the heuristic directive alone decides whether the design is ready.
 
 ```json
 {
@@ -882,8 +882,11 @@ The set-level review no single canvas can give: per-screen score summaries plus 
 |-------|------|-------------|
 | `projectId` | string | The project whose screens to roll up |
 | `canvasIds` | string[]? | Restrict to specific canvases (e.g. one flow); default: every non-variant canvas |
+| `mode` | string? | `"fast"` (default — heuristic roll-up, Chrome-free, keyless) or `"llm"` — adds the **flow critique** |
 
-Returns `{ canvases: [{ canvasId, name, score, blocking, states, missingStates, tokenUsagePercent }], findings, counts, verdict }`. **Advisory, not a gate**: only the per-canvas directives block presenting — this reviews coherence and points at fixes. Every finding names its evidence (which canvases, which values). Variants are excluded from the rows and feed their base's states column. Chrome-free, no API key.
+Returns `{ canvases: [{ canvasId, name, score, blocking, states, missingStates, tokenUsagePercent }], findings, counts, verdict }`. **Advisory, not a gate**: only the per-canvas directives block presenting — this reviews coherence and points at fixes. Every finding names its evidence (which canvases, which values). Variants are excluded from the rows and feed their base's states column. The default mode is Chrome-free and needs no API key.
+
+**`mode: "llm"` — the flow critique.** Up to 8 screens are rendered and judged *together* (one multi-image call) against a fixed flow rubric — `navigation-consistency`, `terminology-consistency`, `state-visibility`, `hierarchy-consistency` — each 1–5 with a rationale, plus per-screen notes naming the canvas (notes naming unknown screens are dropped in parsing; anchoring stays honest). Screens past the cap are listed in `flowSkipped` — pass `canvasIds` to pick the flow yourself; nothing is silently dropped. Needs Chrome and an `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; **without a key the full heuristic roll-up still returns, with a `flowNote` instead of an error** — same contract as `canvas_evaluate`'s llm mode.
 
 ### `canvas_revise`
 
