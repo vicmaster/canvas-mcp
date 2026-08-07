@@ -141,6 +141,10 @@ export interface SceneNode {
   /** skeleton only: set false to opt a block out of the live-viewer pulse.
    * Screenshots/exports/diffs are ALWAYS static regardless (determinism). */
   pulse?: boolean;
+  /** text only (Phase 25 slice A): render digits with tabular (fixed-width)
+   * figures so number columns align vertically. Defaults on for chart tick
+   * labels and the table scaffolds; harmless on non-numeric text. */
+  tabularNums?: boolean;
 
   // SVG path (only for type: 'path'). Inherits fill/stroke/strokeWidth from
   // the standard SceneNode fields; viewBox defaults to `0 0 width height`.
@@ -196,7 +200,7 @@ export interface DesignVariables {
   colors?: Record<string, string>;
   spacing?: Record<string, number>;
   radius?: Record<string, number>;
-  typography?: Record<string, { fontSize: number; fontWeight?: string | number; fontFamily?: string; lineHeight?: number | string }>;
+  typography?: Record<string, { fontSize: number; fontWeight?: string | number; fontFamily?: string; lineHeight?: number | string; letterSpacing?: number }>;
 }
 
 /** Custom font face declaration. Renderer emits a single `@font-face` rule

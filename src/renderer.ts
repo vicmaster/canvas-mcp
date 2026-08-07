@@ -294,12 +294,12 @@ function renderChartSvg(node: SceneNode): string {
   for (const [i, label] of (node.xLabels ?? []).entries()) {
     const n = node.xLabels!.length;
     const lx = round2(geom.x0 + (n === 1 ? 0.5 : i / (n - 1)) * geom.plotW);
-    parts.push(`<text x="${lx}" y="${round2(baselineY + 16)}" font-size="${CHART_LABEL_SIZE}" fill="${labelColor}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${escapeHtml(label)}</text>`);
+    parts.push(`<text x="${lx}" y="${round2(baselineY + 16)}" font-size="${CHART_LABEL_SIZE}" fill="${labelColor}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}" style="font-variant-numeric: tabular-nums">${escapeHtml(label)}</text>`);
   }
   for (const [i, label] of (node.yLabels ?? []).entries()) {
     const n = node.yLabels!.length;
     const ly = round2(geom.y0 + geom.plotH - (n === 1 ? 0.5 : i / (n - 1)) * geom.plotH);
-    parts.push(`<text x="${geom.x0 - 8}" y="${ly + 4}" font-size="${CHART_LABEL_SIZE}" fill="${labelColor}" text-anchor="end">${escapeHtml(label)}</text>`);
+    parts.push(`<text x="${geom.x0 - 8}" y="${ly + 4}" font-size="${CHART_LABEL_SIZE}" fill="${labelColor}" text-anchor="end" style="font-variant-numeric: tabular-nums">${escapeHtml(label)}</text>`);
   }
 
   return `<svg width="100%" height="100%" viewBox="0 0 ${boxW} ${boxH}" xmlns="http://www.w3.org/2000/svg" style="display: block" preserveAspectRatio="none">${parts.join('')}</svg>`;
@@ -627,6 +627,7 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
     s.push(`line-height: ${typeof node.lineHeight === 'number' ? node.lineHeight : node.lineHeight}`);
   }
   if (node.letterSpacing !== undefined) s.push(`letter-spacing: ${node.letterSpacing}px`);
+  if (node.tabularNums) s.push('font-variant-numeric: tabular-nums');
   if (node.textDecoration) s.push(`text-decoration: ${node.textDecoration}`);
   if (node.textTransform) s.push(`text-transform: ${node.textTransform}`);
   if (node.fontVariationSettings) s.push(`font-variation-settings: ${node.fontVariationSettings}`);

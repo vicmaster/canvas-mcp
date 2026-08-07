@@ -3,7 +3,7 @@ import { resolveVariables } from './variables.js';
 import { getCanvasTokens } from './workspaces.js';
 import { renderToHtml } from './renderer.js';
 import { computeLayout, type LayoutRect } from './screenshot.js';
-import { extractInventory, expandInstances } from './drift.js';
+import { extractInventory, expandInstances, isDataLike } from './drift.js';
 
 // --- Types ---
 
@@ -398,7 +398,19 @@ function checkColorContrast(entries: NodeEntry[]): CheckResult {
   return { score, issues };
 }
 
-function checkTypography(entries: NodeEntry[], variables: DesignVariables = {}): CheckResult {
+/** Phase 25 slice A — craft-depth context for checkTypography: canvas width
+ * (fast-mode measure estimate), real rects when detailed mode already
+ * computed them, and the drift-inventory tables for the numeric-column
+ * nudge. All three new checks are SCORE-NEUTRAL advisories — the teeth stay
+ * with contrast/coverage; these raise craft, not gates (measure's >90ch case
+ * is the one warning, and warnings block the directive on their own). */
+interface TypographyContext {
+  rootWidth?: number;
+  layout?: LayoutRect[];
+  tables?: { nodeId: string }[];
+}
+
+function checkTypography(entries: NodeEntry[], variables: DesignVariables = {}, ctx: TypographyContext = {}): CheckResult {
   const issues: EvaluationIssue[] = [];
   const textNodes = entries.filter((e) => e.node.type === 'text');
 
@@ -463,6 +475,95 @@ function checkTypography(entries: NodeEntry[], variables: DesignVariables = {}):
       nodeId: entries[0].node.id,
       message: `All text uses the same font weight. Vary weights to establish visual hierarchy.`,
     });
+  }
+
+  // ── Phase 25 slice A — craft-depth advisories (all score-neutral) ──
+
+  // Measure (FR-A3): prose running past ~75 characters per line is hard to
+  // read. Fast mode estimates chars-per-line from the nearest fixed width
+  // (width ÷ fontSize×0.5); detailed mode uses the real rendered rect.
+  const layoutWidth = new Map<string, number>();
+  if (ctx.layout) {
+    (function walk(rects: LayoutRect[]) {
+      for (const r of rects) {
+        layoutWidth.set(r.nodeId, r.width);
+        if (r.children) walk(r.children);
+      }
+    })(ctx.layout);
+  }
+  const entryByNode = new Map<SceneNode, NodeEntry>();
+  for (const e of entries) entryByNode.set(e.node, e);
+  const nearestFixedWidth = (e: NodeEntry): number | undefined => {
+    let cur: NodeEntry | undefined = e;
+    while (cur) {
+      if (typeof cur.node.width === 'number') return cur.node.width;
+      if (typeof cur.node.maxWidth === 'number') return cur.node.maxWidth;
+      cur = cur.parent ? entryByNode.get(cur.parent) : undefined;
+    }
+    return undefined;
+  };
+  for (const e of textNodes) {
+    const content = typeof e.node.content === 'string' ? e.node.content : '';
+    const size = typeof e.node.fontSize === 'number' ? e.node.fontSize : 14;
+    if (content.length <= 120 || size >= 18) continue;
+    const width = layoutWidth.get(e.node.id) ?? nearestFixedWidth(e) ?? ctx.rootWidth ?? 1440;
+    const charsPerLine = width / (size * 0.5);
+    if (charsPerLine <= 75) continue;
+    const cap = Math.round(75 * size * 0.5);
+    issues.push({
+      category: 'typography',
+      severity: charsPerLine > 90 ? 'warning' : 'info',
+      nodeId: e.node.id,
+      nodeName: e.node.name,
+      message: `Prose runs ~${Math.round(charsPerLine)} characters per line (readable measure is 45–75ch).`,
+      suggestion: `Cap the measure — maxWidth: ${cap} keeps this ~75ch at ${size}px.`,
+    });
+  }
+
+  // Tracking-by-size (FR-A4): display text reads tighter with negative
+  // letter-spacing. Token-declared tracking resolves onto the node (Phase 25
+  // full typography resolution), so a typed system is never nagged; tracked-
+  // out uppercase (eyebrows) is intentional and exempt.
+  for (const e of textNodes) {
+    const size = typeof e.node.fontSize === 'number' ? e.node.fontSize : 0;
+    if (size < 28 || e.node.textTransform === 'uppercase') continue;
+    if (e.node.letterSpacing !== undefined && e.node.letterSpacing < 0) continue;
+    const tracking = size <= 40 ? -0.5 : -1;
+    issues.push({
+      category: 'typography',
+      severity: 'info',
+      nodeId: e.node.id,
+      nodeName: e.node.name,
+      message: `Display text at ${size}px with default tracking — large sizes read tighter with slight negative letter-spacing.`,
+      suggestion: `letterSpacing: ${tracking} (or declare it on the typography token so the whole scale carries it).`,
+      fix: { op: formatUpdateOp(e.node.id, { letterSpacing: tracking }), rationale: `Tighten display tracking at ${size}px (${tracking}px).` },
+    });
+  }
+
+  // Tabular numerals (FR-A2): data-like text in detected table columns
+  // without tabularNums wobbles vertically as digits vary in width.
+  if (ctx.tables?.length) {
+    const byId = new Map(entries.map((e) => [e.node.id, e.node]));
+    for (const t of ctx.tables) {
+      const container = byId.get(t.nodeId);
+      if (!container?.children) continue;
+      const rows = container.children.filter((c) => c.type === 'frame' && (c.children?.length ?? 0) >= 2);
+      for (const row of rows.slice(1)) { // data rows — the header is labels
+        (function walkCells(n: SceneNode): void {
+          if (n.type === 'text' && typeof n.content === 'string' && isDataLike(n.content) && !n.tabularNums) {
+            issues.push({
+              category: 'typography',
+              severity: 'info',
+              nodeId: n.id,
+              message: `Numeric cell "${n.content.trim()}" uses proportional figures — columns of numbers wobble without tabular numerals.`,
+              suggestion: 'Set tabularNums: true (the table scaffolds carry it by default).',
+              fix: { op: formatUpdateOp(n.id, { tabularNums: true }), rationale: 'Align digit columns with tabular figures.' },
+            });
+          }
+          n.children?.forEach(walkCells);
+        })(row);
+      }
+    }
   }
 
   return { score: Math.max(0, Math.min(100, Math.round(score))), issues };
@@ -1392,17 +1493,26 @@ export async function evaluateCanvas(
   if (activeCategories.includes('color')) {
     results.set('color', checkColorContrast(entries));
   }
+  // Phase 25 slice A — detailed-mode layout is computed ONCE and shared by
+  // the consistency and typography (measure) checks.
+  let detailedLayout: LayoutRect[] | undefined;
+  if (options.mode === 'detailed' && (activeCategories.includes('consistency') || activeCategories.includes('typography'))) {
+    const html = renderToHtml(resolvedRoot, 1440, 900, canvas);
+    detailedLayout = await computeLayout(html);
+  }
   if (activeCategories.includes('typography')) {
-    results.set('typography', checkTypography(entries, mergedTokens));
+    results.set('typography', checkTypography(entries, mergedTokens, {
+      rootWidth: typeof canvas.root.width === 'number' ? canvas.root.width : undefined,
+      layout: detailedLayout,
+      tables: extractInventory(resolvedRoot).tables,
+    }));
   }
   if (activeCategories.includes('structure')) {
     results.set('structure', checkStructure(rawEntries, canvas));
   }
   if (activeCategories.includes('consistency')) {
-    if (options.mode === 'detailed') {
-      const html = renderToHtml(resolvedRoot, 1440, 900, canvas);
-      const layout = await computeLayout(html);
-      results.set('consistency', checkConsistencyDetailed(entries, layout));
+    if (options.mode === 'detailed' && detailedLayout) {
+      results.set('consistency', checkConsistencyDetailed(entries, detailedLayout));
     } else {
       results.set('consistency', checkConsistency(entries));
     }

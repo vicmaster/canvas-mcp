@@ -12,6 +12,20 @@ function deepResolve(node: SceneNode, variables: DesignVariables): SceneNode {
 
     if (typeof value === 'string' && value.startsWith('$')) {
       const tokenName = value.slice(1);
+      // Phase 25 slice A (FR-A1) — a typography token referenced from
+      // fontSize applies its FULL spec (size + weight/family/lineHeight/
+      // letterSpacing), not just the size. Explicit node props always win —
+      // only gaps are filled. This retires the long-documented quirk where
+      // declaring a type system only half-applied it.
+      const typo = key === 'fontSize' ? variables.typography?.[tokenName] : undefined;
+      if (typo) {
+        node.fontSize = typo.fontSize;
+        if (node.fontWeight === undefined && typo.fontWeight !== undefined) node.fontWeight = typo.fontWeight;
+        if (node.fontFamily === undefined && typo.fontFamily !== undefined) node.fontFamily = typo.fontFamily;
+        if (node.lineHeight === undefined && typo.lineHeight !== undefined) node.lineHeight = typo.lineHeight;
+        if (node.letterSpacing === undefined && typo.letterSpacing !== undefined) node.letterSpacing = typo.letterSpacing;
+        continue;
+      }
       const resolved = lookupToken(tokenName, variables);
       if (resolved !== undefined) {
         (node as unknown as Record<string, unknown>)[key] = resolved;

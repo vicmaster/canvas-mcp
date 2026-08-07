@@ -75,7 +75,9 @@ const render = () => renderToHtml(root, 1200, 800, canvas);
   check('point markers drawn', (html.match(/<circle /g) ?? []).length === 7);
   check('gridlines drawn', (html.match(/<line /g) ?? []).length === 4);
   check('x labels rendered, empty ticks skipped... rendered as empty', html.includes('>Jan</text>') && html.includes('>Dec</text>'));
-  check('y labels right-aligned at the left edge', html.includes('text-anchor="end">2.7M</text>'));
+  // Phase 25 slice A: tick labels carry tabular-nums, so the anchor attr is
+  // no longer the last one before the text content.
+  check('y labels right-aligned at the left edge', /text-anchor="end"[^>]*>2\.7M<\/text>/.test(html));
 
   // Smooth curve emits cubic segments.
   chart.curve = 'smooth';
