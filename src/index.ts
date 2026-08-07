@@ -24,6 +24,7 @@ import { parseDesignMd } from './design-md-parser.js';
 import { listFeedback, resolveFeedback, openFeedbackCount, appendFeedbackDirective } from './feedback.js';
 import { importHtml, importUrl, renderImportedTree, snapToTokens } from './import.js';
 import { computeStructuralDrift, expandInstances } from './drift.js';
+import { applyPerturbation, compareLayouts, PERTURBATION_NAMES, type PerturbationName } from './stress.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
 import { evaluateCanvas, relaxedByGenre, knownGenres } from './evaluate.js';
 import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
@@ -813,7 +814,7 @@ server.tool(
 // --- snapshot_layout ---
 server.tool(
   'snapshot_layout',
-  'Get computed bounding boxes for all nodes by rendering the canvas in a browser. Returns { nodeId, x, y, width, height } for each node.',
+  'Get computed bounding boxes for all nodes by rendering the canvas in a browser. Returns { nodeId, x, y, width, height } for each node — plus, on any node whose content exceeds its box, overflow data: scrollWidth/clientWidth/scrollHeight/clientHeight and an ellipsis flag when a designed text-overflow truncation is active (the same capture canvas_stress uses to detect clipping).',
   {
     canvasId: z.string().describe('Canvas ID'),
     nodeId: z.string().optional().describe('Root node ID to start from'),
@@ -1773,6 +1774,82 @@ server.tool(
         note: 'Fixes written to the canvas — re-run canvas_evaluate to confirm.',
       }, null, 2) }],
     };
+  }
+);
+
+// --- canvas_stress (Phase 24 slice D) ---
+server.tool(
+  'canvas_stress',
+  `Content stress test: does the design survive real data? Re-renders the canvas under hostile-but-realistic content perturbations and reports exactly what broke, by node id — the too-long name that clips, the German label that wraps ugly, the "999+" badge that blows its box. Never mutates the canvas.
+
+Perturbations (default: all): long-text (non-data text ×2.2 plus one long unbroken token — the wrap-breaker), i18n (×1.4 — the German/Finnish expansion rule), big-numbers (data-like text to its widest realistic form: "9" → "999+", "$1.5M" → "$1,520,847.33"), empty (detected tables lose their data rows), many (data rows ×3). Tables are found with the same inventory drift and coverage use.
+
+Finding kinds: clip (content cut off — INFO when a designed text-overflow ellipsis is doing its job, WARNING otherwise), overflow-x (a node escapes its parent box or the canvas), layout-shift (an UNTOUCHED node ballooning — perturbed nodes and their ancestors legitimately grow and are exempt). Only NEW breakage counts: anything already clipping at baseline is the design's standing state, not the perturbation's fault. verdict is CLEAN only with zero warnings — fix findings with fluid widths, minWidth floors, and wrapping (see the width-strategy guidelines), then re-run. Chrome required; ~1 render per perturbation.`,
+  {
+    canvasId: z.string().describe('Canvas to stress'),
+    perturbations: z.array(z.enum(['long-text', 'i18n', 'big-numbers', 'empty', 'many'])).optional()
+      .describe('Subset to run (default: all five)'),
+    screenshots: z.boolean().optional().describe('Attach a render of each perturbation that produced warnings (default false)'),
+  },
+  async ({ canvasId, perturbations, screenshots }) => {
+    ensureFresh(canvasId);
+    const canvas = getCanvas(canvasId);
+    if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
+
+    try {
+      const w = typeof canvas.root.width === 'number' ? canvas.root.width : 1440;
+      const h = typeof canvas.root.height === 'number' ? canvas.root.height : 900;
+      const merged = getCanvasTokens(canvas);
+      const { renderOpts, fontWarnings } = await prepareRender(canvas);
+      // Instance-expanded so stamped components stress like everything else;
+      // the expanded tree is the base for BOTH sides so node ids align.
+      const expandedBase = expandInstances(canvas.root, canvas);
+      const baselineHtml = renderToHtml(resolveVariables(structuredClone(expandedBase), merged), w, h, canvas, renderOpts);
+      const baselineLayout = await computeLayout(baselineHtml, undefined, 25, { width: w, height: h });
+
+      const names = (perturbations ?? PERTURBATION_NAMES) as PerturbationName[];
+      const perturbationResults: Record<string, unknown>[] = [];
+      const images: { type: 'image'; data: string; mimeType: string }[] = [];
+      let warnings = 0;
+      let infos = 0;
+
+      for (const name of names) {
+        const { root, touched } = applyPerturbation(name, expandedBase);
+        if (touched.length === 0) {
+          perturbationResults.push({ name, skipped: 'nothing to perturb (no matching content)' });
+          continue;
+        }
+        const html = renderToHtml(resolveVariables(structuredClone(root), merged), w, h, canvas, renderOpts);
+        const layout = await computeLayout(html, undefined, 25, { width: w, height: h });
+        const findings = compareLayouts(baselineLayout, layout, touched, w);
+        warnings += findings.filter((f) => f.severity === 'warning').length;
+        infos += findings.filter((f) => f.severity === 'info').length;
+        perturbationResults.push({ name, touchedCount: touched.length, findings });
+        if (screenshots && findings.some((f) => f.severity === 'warning')) {
+          images.push({ type: 'image', data: await takeScreenshot(html, { width: w, height: h, scale: 1 }), mimeType: 'image/png' });
+        }
+      }
+
+      const verdict = warnings === 0
+        ? `CLEAN — the design held its layout under ${names.length} content perturbation(s).${infos ? ` ${infos} designed truncation(s) engaged (info).` : ''}`
+        : `FRAGILE — ${warnings} layout break(s) under hostile content. Fix with fluid widths / minWidth floors / wrapping (see width strategies), then re-run.`;
+
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({
+            canvasId,
+            versionHash: canvasVersionHash(canvas),
+            perturbations: perturbationResults,
+            counts: { warnings, infos },
+            verdict,
+          }, null, 2) },
+          ...images,
+          ...fontWarningContent(fontWarnings),
+        ],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
+    }
   }
 );
 
