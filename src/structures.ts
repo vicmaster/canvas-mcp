@@ -927,13 +927,16 @@ const emptyState: Structure = {
     children: [
       { id: 'es-icon', type: 'icon', icon: 'inbox', iconSize: 28, iconColor: COLOR.textSecondary },
       { id: 'es-title', type: 'text', content: 'Nothing here yet', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
-      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 13, color: COLOR.textSecondary },
+      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 12, color: COLOR.textSecondary },
       {
         id: 'es-cta', type: 'frame', name: 'CTA', layout: 'horizontal', alignItems: 'center', gap: 8,
         padding: [8, 16], cornerRadius: 8, fill: COLOR.accent, width: 'fit-content',
         children: [
-          { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: '#FFFFFF' },
-          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 13, fontWeight: 600, color: '#FFFFFF' },
+          // bg-primary as on-accent text is theme-adaptive: near-white on the
+          // dark accent in light mode, near-black on the light accent in dark
+          // mode (the tier() CTA convention — a literal white breaks in dark).
+          { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: COLOR.bgPrimary },
+          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 13, fontWeight: 600, color: COLOR.bgPrimary },
         ],
       },
     ],

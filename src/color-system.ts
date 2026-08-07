@@ -123,10 +123,21 @@ const STATUS_L = 0.62;
 const STATUS_C = 0.15;
 
 export function statusColors(): Record<keyof typeof STATUS_HUES, string> {
+  // Status colors are used AS TEXT (validation messages, deltas) — each is
+  // darkened from the band until it clears AA against white (dogfood fix:
+  // the raw band's danger sat at 3.9:1). Hue and chroma held.
+  const forText = (h: number): string => {
+    let o: Oklch = { l: STATUS_L, c: STATUS_C, h };
+    const white: [number, number, number] = [255, 255, 255];
+    for (let i = 0; i < 30 && contrastRatio(rgbOf(oklchToHex(o)), white) < 4.5; i++) {
+      o = { ...o, l: Math.max(0.2, o.l - 0.02) };
+    }
+    return oklchToHex(o);
+  };
   return {
-    success: oklchToHex({ l: STATUS_L, c: STATUS_C, h: STATUS_HUES.success }),
-    warning: oklchToHex({ l: STATUS_L, c: STATUS_C, h: STATUS_HUES.warning }),
-    danger: oklchToHex({ l: STATUS_L, c: STATUS_C, h: STATUS_HUES.danger }),
+    success: forText(STATUS_HUES.success),
+    warning: forText(STATUS_HUES.warning),
+    danger: forText(STATUS_HUES.danger),
   };
 }
 

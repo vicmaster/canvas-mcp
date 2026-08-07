@@ -66,8 +66,16 @@ const aa = (fg: string, bg: string) => contrastRatio(rgb(fg), rgb(bg)) >= 4.5;
   check('neutral carries the seed hue', Math.abs(hexToOklch(neutral[500]).h - hexToOklch('#0E7490').h) < 5);
 
   const status = statusColors();
-  const Ls = Object.values(status).map((hex) => hexToOklch(hex).l);
-  check('status colors share one lightness band (±0.01)', Math.max(...Ls) - Math.min(...Ls) < 0.01, Ls.map((l) => l.toFixed(3)).join(','));
+  // Dogfood revision: the invariant is consistent CONTRAST, not consistent
+  // lightness — status colors are used as text (validation messages) and
+  // each is darkened from the shared band until it clears AA on white.
+  const failingText = Object.entries(status).filter(([, hex]) => !aa(hex, '#FFFFFF'));
+  check('status colors read as TEXT on white (AA)', failingText.length === 0, failingText.map(([k, hex]) => `${k}: ${hex}`).join('; '));
+  const hueDrift = (['success', 'warning', 'danger'] as const).map((k) => {
+    const target = { success: 150, warning: 75, danger: 27 }[k];
+    return Math.abs(hexToOklch(status[k]).h - target);
+  });
+  check('status hues held while darkening (<8°)', hueDrift.every((d) => d < 8), hueDrift.map((d) => d.toFixed(1)).join(','));
 }
 
 // ── semantic mapping: AA by construction, both themes ───────────────────────
