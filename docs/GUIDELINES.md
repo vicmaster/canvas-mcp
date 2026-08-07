@@ -115,6 +115,7 @@ Authoring rules:
 - **Canvas-level variables are escape hatches**, not the primary surface. Use them when one canvas legitimately diverges from the design system; otherwise leave them empty and let the workspace tokens flow through.
 - **Presets work at every layer.** `workspace_apply_preset({ workspaceId, preset: "dark" })` copies the dark-preset tokens into the workspace; `project_apply_preset` and the existing `apply_preset` (canvas-level) do the same at their respective layers.
 - **Don't hand-pick a type scale — generate one.** `generate_scale({ ratio: "major-third", workspaceId })` derives a full `text-xs`…`text-3xl` scale plus a paired `space-3xs`…`space-3xl` scale from a named ratio, with the craft defaults (line-height bands, display tracking) baked in and sizes pinned against the ratio check. Pass `fluid: {}` for Utopia-style `clamp()` sizes that interpolate between viewports instead of static px.
+- **Don't eyeball a palette from ten hexes — generate one.** `generate_color_system({ seed: "#2563EB", workspaceId })` derives OKLCH `primary-50`…`900` + a matched neutral ramp + status colors + the `bg-surface`/`text-primary`/`accent`/… semantic tokens the structures already speak, with every text/surface pair AA-clean by construction.
 
 Merge semantics are per-category: a project that only sets `colors` doesn't reset the workspace's `spacing`/`radius`/`typography`. A canvas that only overrides `colors.primary` keeps every other workspace color.
 

@@ -26,6 +26,7 @@ import { importHtml, importUrl, renderImportedTree, snapToTokens } from './impor
 import { computeStructuralDrift, expandInstances } from './drift.js';
 import { applyPerturbation, compareLayouts, PERTURBATION_NAMES, type PerturbationName } from './stress.js';
 import { generateTypeScale, generateSpaceScale, resolveRatio, type RatioName } from './scales.js';
+import { generateColorSystem } from './color-system.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
 import { evaluateCanvas, relaxedByGenre, knownGenres } from './evaluate.js';
 import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
@@ -949,6 +950,76 @@ Merges into the target layer like set_variables (existing token names are overwr
         spacing,
         ...(overwrote.length ? { overwrote } : {}),
         note: `Reference sizes as fontSize: "$text-…" (the full token spec — line-height and display tracking — applies through the ref) and spacing as "$space-…". Generated sizes are pinned for the type-scale check.${fluid ? ' Fluid clamp() sizes are exempt from numeric scale checks; the space scale stays static.' : ''}`,
+      }, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  }
+);
+
+// --- generate_color_system (Phase 25 slice C) ---
+server.tool(
+  'generate_color_system',
+  `One seed color → a full perceptual color system: OKLCH ramps primary-50…900 (even lightness steps, chroma tapered at the extremes, gamut-clipped toward lower chroma — never hue-shifted), a matched neutral ramp (a whisper of the seed's hue — never dead grey, never visibly tinted), status colors (success / warning / danger at one consistent lightness band), and the SEMANTIC tokens the structures already speak: bg-primary, bg-surface, bg-elevated, text-primary, text-secondary, border, accent. Text and accent steps are picked by MEASURED contrast — every semantic text/surface pair clears WCAG AA by construction, not by hope.
+
+The result also reports the DARK mapping (the Radix pattern: a reversed walk of the same ramps, not inverted hex) under "dark" — storage for it lands with the dual-theme slice; until then treat it as the reference mapping for a dark preset. Writes the light system to exactly ONE of canvasId / projectId / workspaceId. Canvas scope honors the inherited-design-system contract (tokens the canvas inherits from workspace/project are PRESERVED and reported, same as apply_preset — pass them explicitly via set_variables if you want the generated values). Raise your palette floor: generate first, then adjust individual tokens — don't eyeball ten hexes.`,
+  {
+    seed: z.string().describe('The brand color to derive everything from (#RRGGBB)'),
+    canvasId: z.string().optional().describe('Write to this canvas\'s variables'),
+    projectId: z.string().optional().describe('Write to this project\'s design system'),
+    workspaceId: z.string().optional().describe('Write to this workspace\'s design system'),
+  },
+  async ({ seed, canvasId, projectId, workspaceId }) => {
+    const targets = [canvasId, projectId, workspaceId].filter(Boolean);
+    if (targets.length !== 1) {
+      return { content: [{ type: 'text', text: 'Error: pass exactly ONE of canvasId / projectId / workspaceId — the layer the system is written to.' }], isError: true };
+    }
+    try {
+      const system = generateColorSystem(seed);
+      const colors: Record<string, string> = {};
+      for (const [step, hex] of Object.entries(system.primary)) colors[`primary-${step}`] = hex;
+      for (const [step, hex] of Object.entries(system.neutral)) colors[`neutral-${step}`] = hex;
+      Object.assign(colors, system.status, system.light);
+
+      let preserved: Array<{ category: string; key: string; kept: string; preset: string }> = [];
+      let overwrote: string[] = [];
+      let wroteTo: Record<string, string>;
+      if (canvasId) {
+        ensureFresh(canvasId);
+        const canvas = getCanvas(canvasId);
+        if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
+        overwrote = Object.keys(colors).filter((k) => canvas.variables.colors?.[k] !== undefined);
+        const merge = applyPresetTokens(canvas, { colors }, getInheritedTokens(canvas));
+        preserved = merge.preserved;
+        touchCanvas(canvasId);
+        wroteTo = { layer: 'canvas', id: canvasId };
+      } else if (projectId) {
+        const existing = getProjectDesignSystem(projectId);
+        overwrote = Object.keys(colors).filter((k) => existing?.colors?.[k] !== undefined);
+        if (setProjectDesignSystem(projectId, { colors }) === undefined) {
+          return { content: [{ type: 'text', text: `Error: Project "${projectId}" not found` }], isError: true };
+        }
+        wroteTo = { layer: 'project', id: projectId };
+      } else {
+        const existing = getWorkspaceDesignSystem(workspaceId!);
+        overwrote = Object.keys(colors).filter((k) => existing?.colors?.[k] !== undefined);
+        if (setWorkspaceDesignSystem(workspaceId!, { colors }) === undefined) {
+          return { content: [{ type: 'text', text: `Error: Workspace "${workspaceId}" not found` }], isError: true };
+        }
+        wroteTo = { layer: 'workspace', id: workspaceId! };
+      }
+
+      return { content: [{ type: 'text', text: JSON.stringify({
+        wroteTo,
+        seed: system.seed,
+        primary: system.primary,
+        neutral: system.neutral,
+        status: system.status,
+        semantics: system.light,
+        dark: system.dark,
+        ...(preserved.length ? { preservedFromDesignSystem: preserved } : {}),
+        ...(overwrote.length ? { overwrote } : {}),
+        note: 'Light system written; reference tokens as $primary-600, $bg-surface, $accent, … (the semantic names are the same vocabulary the structure scaffolds use). "dark" is the reference mapping — dual-theme storage lands in the next slice.',
       }, null, 2) }] };
     } catch (err) {
       return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
