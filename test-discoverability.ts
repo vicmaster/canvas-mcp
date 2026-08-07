@@ -218,6 +218,33 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── 11. Phase 26 vocabulary is surfaced where agents look ────────────────────
+// Grid's authoring props, the project roll-up's finding kinds (parsed from
+// the ProjectFindingKind union), and the flow-rubric axes (live import).
+{
+  for (const prop of ['gridColumns', 'gridColumn', 'gridRow', 'rowGap']) {
+    expect(`grid prop "${prop}" in src/index.ts`, indexSrc.includes(prop));
+    expect(`grid prop "${prop}" in README`, readme.includes(prop));
+  }
+  expect('gridColumns shown in GUIDELINES', guidelines.includes('gridColumns'));
+
+  const projSrc = readFileSync('src/project-evaluate.ts', 'utf-8');
+  const union = projSrc.match(/export type ProjectFindingKind =([\s\S]*?);/)?.[1] ?? '';
+  const kinds = [...union.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+  expect('project finding kinds found', kinds.length >= 5, kinds.join(', '));
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    const missing = kinds.filter((k) => !surface[1].includes(k));
+    expect(`every project finding kind in ${surface[0]}`, missing.length === 0, missing.join(', '));
+  }
+
+  const { FLOW_AXES } = await import('./src/llm-judge.js');
+  expect('flow axes found', FLOW_AXES.length >= 4, FLOW_AXES.join(', '));
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    const missing = FLOW_AXES.filter((a: string) => !surface[1].includes(a));
+    expect(`every flow axis in ${surface[0]}`, missing.length === 0, missing.join(', '));
+  }
+}
+
 let allPass = true;
 for (const c of checks) {
   if (!c.ok) allPass = false;

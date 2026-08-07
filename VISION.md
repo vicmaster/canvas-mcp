@@ -501,9 +501,9 @@ The design-quality cluster's final third (points 5, 6, 12): everything framesmit
 - [x] Slice A — grid authoring: `layout: "grid"` + `gridColumns` templates + `gridColumn`/`gridRow` spans + responsive collapse; `bento-grid` rebuilt on real grid
 - [x] Slice B — `project_evaluate`: per-screen roll-up + cross-screen checks (radius/accent drift, token-adoption outliers, hand-copied chrome → create_component path, coverage table)
 - [x] Slice C — flow critique: `judgeFlow` multi-image rubric (mode "llm", capped + skipped-reported, stub-testable)
-- [ ] Slice D — agent surfaces: grid vocabulary + "finish the module with project_evaluate" + discoverability pins
+- [x] Slice D — agent surfaces: grid vocabulary + "finish the module with project_evaluate" + discoverability pins
 
-_Full spec-driven breakdown in [`docs/specs/PHASE-26-SPEC.md`](docs/specs/PHASE-26-SPEC.md)._
+_Full spec-driven breakdown in [`docs/specs/PHASE-26-SPEC.md`](docs/specs/PHASE-26-SPEC.md). All slices shipped — Phase 26 complete, and with it all 12 points of the design-quality cluster (Phases 24–26)._
 
 ### Issue-driven improvements (post-v1.8)
 
