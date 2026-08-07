@@ -485,7 +485,7 @@ _Full spec-driven breakdown in [`docs/specs/PHASE-24-SPEC.md`](docs/specs/PHASE-
 
 The design-quality cluster's typographic + chromatic half (points 3, 4, 7, 8, 9, 10, 11): the token system gets generative and typographically serious. Fix the typography-token lie ($refs resolve fontSize only), make numerics/measure/tracking craft defaults, derive scales from a ratio and full dual-theme color systems from one seed (perceptual OKLCH ramps, matched neutral, status colors), render + verify contrast in BOTH themes (APCA advisory, WCAG 2.2 gate), and catch token detachment + ad-hoc motion.
 
-- [ ] Slice A — typography correctness: full $token resolution (weight/family/lineHeight/letterSpacing), tabular numerals, measure + tracking checks
+- [x] Slice A — typography correctness: full $token resolution (weight/family/lineHeight/letterSpacing), tabular numerals, measure + tracking checks
 - [ ] Slice B — `generate_scale`: modular type + paired space tokens from a named ratio, optional fluid clamp() forms
 - [ ] Slice C — `src/color-system.ts` + `generate_color_system`: one seed → OKLCH ramps 50–900, matched neutral, status colors, semantic mapping
 - [ ] Slice D — dual theme: sparse `dark` token layer, theme param on render/evaluate/viewer, both-mode contrast + APCA info

@@ -849,8 +849,8 @@ function tableRow(id: string): SceneNode {
           {
             id: `${id}-id-copy`, type: 'frame', name: 'Identity', layout: 'vertical', gap: 4,
             children: [
-              { id: `${id}-name`, type: 'text', content: 'Name — to confirm', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
-              { id: `${id}-email`, type: 'text', content: 'email — to confirm', fontSize: 12, color: COLOR.textSecondary },
+              { id: `${id}-name`, type: 'text', content: 'Name — to confirm', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, tabularNums: true },
+              { id: `${id}-email`, type: 'text', content: 'email — to confirm', fontSize: 12, color: COLOR.textSecondary, tabularNums: true },
             ],
           },
         ],
@@ -881,7 +881,7 @@ function tableRow(id: string): SceneNode {
 function tableHeaderCell(id: string, label: string, width: string, alignEnd = false): SceneNode {
   return {
     id, type: 'frame', width, layout: 'horizontal', ...(alignEnd ? { justifyContent: 'end' as const } : {}),
-    children: [{ id: `${id}-text`, type: 'text', content: label, fontSize: 12, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: COLOR.textSecondary }],
+    children: [{ id: `${id}-text`, type: 'text', content: label, fontSize: 12, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: COLOR.textSecondary, tabularNums: true }],
   };
 }
 
