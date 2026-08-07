@@ -89,6 +89,17 @@ s3=I("document", { type: "skeleton", pulse: false })
   applyStructure(skt, 'skeleton-table', { targetId: skt.root.children![0].id });
   const ev2 = await evaluateCanvas(skt, { mode: 'fast', categories: ['cliche'] });
   check('skeleton-table scaffold: zero cliché tells', ev2.issues.length === 0, JSON.stringify(ev2.issues.map((i) => i.tell)));
+
+  // Dogfood regression: state scaffolds must also be ON-SCALE — an off-scale
+  // padding (the original [14, 16] rows / [10, 16] CTA) trips the spacing
+  // linter every time the scaffold is stamped.
+  for (const name of ['skeleton-table', 'empty-state', 'skeleton-card']) {
+    const sc = createCanvas(`Scale Gate ${name}`);
+    parseAndExecute(sc.root, `panel=I("document", { type: "frame", layout: "vertical", padding: 48 })`, sc);
+    applyStructure(sc, name, { targetId: sc.root.children![0].id });
+    const evS = await evaluateCanvas(sc, { mode: 'fast', categories: ['spacing'] });
+    check(`"${name}" scaffold: on-scale spacing`, evS.issues.length === 0, JSON.stringify(evS.issues.map((i) => i.message)));
+  }
 }
 
 console.log(allPass ? '\nAll skeleton tests passed.' : '\nSOME TESTS FAILED');

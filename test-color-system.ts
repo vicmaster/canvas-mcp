@@ -90,6 +90,18 @@ const aa = (fg: string, bg: string) => contrastRatio(rgb(fg), rgb(bg)) >= 4.5;
   const { light, dark } = semanticMapping(generateRamp('#0E7490'), matchedNeutral('#0E7490'));
   check('light page is off-white, not #FFFFFF', light['bg-primary'].toUpperCase() !== '#FFFFFF');
   check('dark surfaces sit above the page', hexToOklch(dark['bg-surface']).l < hexToOklch(dark['bg-elevated']).l);
+
+  // Dogfood regression: status colors must read in BOTH themes — the dark
+  // layer re-lights them for AA against the dark surface (a $danger message
+  // failed at 3.34:1 before this).
+  for (const seed of ['#0E7490', '#DC2626', '#6366F1']) {
+    const sys = generateColorSystem(seed);
+    const failing = (['success', 'warning', 'danger'] as const).filter((k) => !aa(sys.dark[k], sys.dark['bg-surface']));
+    check(`dark status colors AA on dark surface (seed ${seed})`, failing.length === 0,
+      failing.map((k) => `${k}: ${sys.dark[k]} = ${contrastRatio(rgb(sys.dark[k]), rgb(sys.dark['bg-surface'])).toFixed(2)}`).join('; '));
+    check(`dark status keeps hue (seed ${seed})`, (['success', 'danger'] as const).every((k) =>
+      Math.abs(hexToOklch(sys.dark[k]).h - hexToOklch(sys.status[k]).h) < 8));
+  }
 }
 
 // ── the full system ─────────────────────────────────────────────────────────

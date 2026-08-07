@@ -185,18 +185,36 @@ export function semanticMapping(primary: Ramp, neutral: Ramp): { light: Semantic
   return { light, dark };
 }
 
-/** The full system from one seed — what generate_color_system writes/reports. */
+/** Raise a color's lightness (hue and chroma held) until it clears `min`
+ * contrast against `bg` — status colors tuned for light surfaces go muddy on
+ * dark ones, and a $danger message must read in BOTH themes. */
+function raiseForContrast(hex: string, bgHex: string, min = 4.5): string {
+  let o = hexToOklch(hex);
+  for (let i = 0; i < 30 && contrastRatio(rgbOf(oklchToHex(o)), rgbOf(bgHex)) < min; i++) {
+    o = { ...o, l: Math.min(0.95, o.l + 0.02) };
+  }
+  return oklchToHex(o);
+}
+
+export type StatusColors = Record<'success' | 'warning' | 'danger', string>;
+
+/** The full system from one seed — what generate_color_system writes/reports.
+ * The dark layer includes STATUS overrides (dogfood fix): the light-tuned
+ * status colors are re-lit for AA against the dark surface. */
 export function generateColorSystem(seedHex: string): {
   seed: { hex: string; oklch: Oklch };
   primary: Ramp;
   neutral: Ramp;
-  status: Record<'success' | 'warning' | 'danger', string>;
+  status: StatusColors;
   light: SemanticTheme;
-  dark: SemanticTheme;
+  dark: SemanticTheme & StatusColors;
 } {
   const primary = generateRamp(seedHex);
   const neutral = matchedNeutral(seedHex);
   const status = statusColors();
   const { light, dark } = semanticMapping(primary, neutral);
-  return { seed: { hex: seedHex, oklch: hexToOklch(seedHex) }, primary, neutral, status, light, dark };
+  const darkStatus = Object.fromEntries(
+    Object.entries(status).map(([k, hex]) => [k, raiseForContrast(hex, dark['bg-surface'])]),
+  ) as StatusColors;
+  return { seed: { hex: seedHex, oklch: hexToOklch(seedHex) }, primary, neutral, status, light, dark: { ...dark, ...darkStatus } };
 }
