@@ -177,7 +177,18 @@ List canvases. Excludes archived canvases by default. A row carrying `openFeedba
 | `projectId` | string? | Scope to one project |
 | `includeArchived` | bool? | Include archived canvases (default false) |
 
-Returns `[{ id, name, createdAt, lastModified, versionHash, projectId, archived, openFeedback? }]` — `openFeedback` (a count) is present only when > 0; `versionHash` is the design-content hash `canvas_version` checks approvals against.
+Returns `[{ id, name, createdAt, lastModified, versionHash, projectId, archived, openFeedback?, variant?, variants? }]` — `openFeedback` (a count) is present only when > 0; `versionHash` is the design-content hash `canvas_version` checks approvals against. `variant: { of, state }` is present on a state-variant row; `variants: [{ state, canvasId }]` rolls the designed states onto a base row (see `canvas_add_variant`).
+
+### `canvas_add_variant`
+
+Clone a screen into a linked **state variant** — the empty / loading / error version of a canvas, as its own sibling canvas. The clone gets re-keyed node IDs, the same project, copied tokens/components/fonts, and carries the provenance/genre stamp (feedback and critique stay behind); it's named `<base> · <state>` and linked via `metadata.variant = { of, state }`.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `canvasId` | string | The base canvas (a variant id also works — it resolves to the root base; variants never nest) |
+| `state` | string | The state this variant designs — `empty` / `loading` / `error` recommended; free string accepted |
+
+Returns `{ canvasId, name, state, of, idMap }` — `idMap` maps every base node id to its clone, so follow-up edits target the right nodes immediately. One canvas per state per base (a duplicate state errors). The viewer shows a screen and its variants as one card with state chips; `canvas_list` rolls designed states onto the base row.
 
 ### `canvas_move` / `canvas_archive` / `canvas_unarchive` / `canvas_delete`
 

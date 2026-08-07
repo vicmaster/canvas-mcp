@@ -329,8 +329,25 @@ export interface Canvas {
     critique?: CritiqueVerdict;
     /** Phase 21 — point-and-tell comments from the viewer. */
     feedback?: FeedbackEntry[];
+    /** Phase 24 slice A — marks this canvas as a STATE VARIANT (empty /
+     * loading / error / …) of a base canvas. Variants are sibling canvases
+     * cloned from the base; the viewer groups them and the coverage check
+     * (slice C) counts them. */
+    variant?: VariantLink;
     [key: string]: unknown;
   };
+}
+
+/** Phase 24 slice A — the link a state-variant canvas carries back to its base.
+ * `state` is a free string; `empty` / `loading` / `error` are the recommended
+ * (and, in slice C, demanded) vocabulary. */
+export interface VariantLink {
+  /** The base canvas this variant belongs to. */
+  of: string;
+  /** The state this canvas designs (e.g. "empty", "loading", "error"). */
+  state: string;
+  /** ISO-8601 timestamp when the variant was created. */
+  at: string;
 }
 
 export interface Workspace {

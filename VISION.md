@@ -473,7 +473,7 @@ _Full spec-driven breakdown in [`docs/specs/PHASE-23-SPEC.md`](docs/specs/PHASE-
 
 framesmith designs the happy path of a single static frame with ideal data — but real UX quality lives in the empty table, the loading skeleton, the form error, and the name that's too long for its cell. Make screen states first-class (linked variant canvases, one call to clone, viewer chips) with an evaluator that *demands* coverage on data-bearing screens, and make content robustness mechanical (`canvas_stress`: hostile-but-realistic content perturbations → exactly what clipped or overflowed, by node id).
 
-- [ ] Slice A — variants: `metadata.variant` links + `canvas_add_variant` (clone, re-keyed IDs, idMap) + `canvas_list` rollups + viewer state chips
+- [x] Slice A — variants: `metadata.variant` links + `canvas_add_variant` (clone, re-keyed IDs, idMap) + `canvas_list` rollups + viewer state chips
 - [ ] Slice B — loading/empty primitives: `skeleton` node type (token-derived, static in screenshots) + `empty-state` / `skeleton-table` / `skeleton-card` scaffolds
 - [ ] Slice C — coverage teeth: new `coverage` evaluate category — data-bearing screens warn per missing empty/loading (error for forms), directive-blocking
 - [ ] Slice D — stress testing: `src/stress.ts` perturbation engine (long-text / i18n / big-numbers / empty / many) + `computeLayout` overflow capture + `canvas_stress`
