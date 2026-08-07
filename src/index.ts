@@ -730,9 +730,9 @@ The shared-app-shell workflow: build the shell once, create_component it, then c
  * merge tokens, resolve $refs, and run the font backstop so any referenced
  * family renders in its real face (cache-first; resolution failure degrades to
  * the fallback stack + a warning, never a render failure). */
-async function prepareRender(canvas: Canvas): Promise<{ resolved: SceneNode; renderOpts: RenderOptions; fontWarnings: string[] }> {
+async function prepareRender(canvas: Canvas, theme?: 'light' | 'dark'): Promise<{ resolved: SceneNode; renderOpts: RenderOptions; fontWarnings: string[] }> {
   const merged = getCanvasTokens(canvas);
-  const resolved = resolveVariables(canvas.root, merged);
+  const resolved = resolveVariables(canvas.root, merged, { theme });
   const { extraFonts, warnings } = await ensureFontsForRender(resolved, canvas, merged);
   return { resolved, renderOpts: { extraFonts, bodyFontFamily: bodyFontFamilyFromTokens(merged) }, fontWarnings: warnings };
 }
@@ -765,12 +765,13 @@ server.tool(
     width: z.number().optional().describe('Viewport width in pixels (default 1440)'),
     height: z.number().optional().describe('Viewport height in pixels (default 900)'),
     scale: z.number().optional().describe('Device scale factor (default 2 for retina)'),
+    theme: z.enum(['light', 'dark']).optional().describe('Render theme — "dark" applies the design system\'s dark token layer (dark.colors overrides); default light. No-op when no dark layer exists.'),
   },
-  async ({ canvasId, nodeId, width, height, scale }) => {
+  async ({ canvasId, nodeId, width, height, scale, theme }) => {
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
-    const { resolved, renderOpts, fontWarnings } = await prepareRender(canvas);
+    const { resolved, renderOpts, fontWarnings } = await prepareRender(canvas, theme);
     const w = width ?? (typeof canvas.root.width === 'number' ? canvas.root.width : 1440);
     const h = height ?? (typeof canvas.root.height === 'number' ? canvas.root.height : 900);
     const html = renderToHtml(resolved, w, h, canvas, renderOpts);
@@ -871,6 +872,9 @@ server.tool(
         lineHeight: z.union([z.number(), z.string()]).optional(),
         letterSpacing: z.number().optional().describe('px — applied through $refs like the rest of the token spec'),
       })).optional(),
+      dark: z.object({
+        colors: z.record(z.string()).optional(),
+      }).optional().describe('Dark-theme override layer, SPARSE by token name — anything not overridden inherits the light value. Read by theme: "dark" renders and the dual-theme contrast check.'),
     }).describe('Design variables to set'),
   },
   async ({ canvasId, variables }) => {
@@ -962,7 +966,7 @@ server.tool(
   'generate_color_system',
   `One seed color → a full perceptual color system: OKLCH ramps primary-50…900 (even lightness steps, chroma tapered at the extremes, gamut-clipped toward lower chroma — never hue-shifted), a matched neutral ramp (a whisper of the seed's hue — never dead grey, never visibly tinted), status colors (success / warning / danger at one consistent lightness band), and the SEMANTIC tokens the structures already speak: bg-primary, bg-surface, bg-elevated, text-primary, text-secondary, border, accent. Text and accent steps are picked by MEASURED contrast — every semantic text/surface pair clears WCAG AA by construction, not by hope.
 
-The result also reports the DARK mapping (the Radix pattern: a reversed walk of the same ramps, not inverted hex) under "dark" — storage for it lands with the dual-theme slice; until then treat it as the reference mapping for a dark preset. Writes the light system to exactly ONE of canvasId / projectId / workspaceId. Canvas scope honors the inherited-design-system contract (tokens the canvas inherits from workspace/project are PRESERVED and reported, same as apply_preset — pass them explicitly via set_variables if you want the generated values). Raise your palette floor: generate first, then adjust individual tokens — don't eyeball ten hexes.`,
+The DARK theme ships in the same call (the Radix pattern: a reversed walk of the same ramps, not inverted hex): the semantic dark mapping is WRITTEN to the layer's dark.colors override — so theme: "dark" on screenshot/export renders it and canvas_evaluate contrast-checks BOTH themes from then on. Writes the light system to exactly ONE of canvasId / projectId / workspaceId. Canvas scope honors the inherited-design-system contract (tokens the canvas inherits from workspace/project are PRESERVED and reported, same as apply_preset — pass them explicitly via set_variables if you want the generated values). Raise your palette floor: generate first, then adjust individual tokens — don't eyeball ten hexes.`,
   {
     seed: z.string().describe('The brand color to derive everything from (#RRGGBB)'),
     canvasId: z.string().optional().describe('Write to this canvas\'s variables'),
@@ -991,19 +995,20 @@ The result also reports the DARK mapping (the Radix pattern: a reversed walk of 
         overwrote = Object.keys(colors).filter((k) => canvas.variables.colors?.[k] !== undefined);
         const merge = applyPresetTokens(canvas, { colors }, getInheritedTokens(canvas));
         preserved = merge.preserved;
+        setVariables(canvas, { dark: { colors: { ...system.dark } } });
         touchCanvas(canvasId);
         wroteTo = { layer: 'canvas', id: canvasId };
       } else if (projectId) {
         const existing = getProjectDesignSystem(projectId);
         overwrote = Object.keys(colors).filter((k) => existing?.colors?.[k] !== undefined);
-        if (setProjectDesignSystem(projectId, { colors }) === undefined) {
+        if (setProjectDesignSystem(projectId, { colors, dark: { colors: { ...system.dark } } }) === undefined) {
           return { content: [{ type: 'text', text: `Error: Project "${projectId}" not found` }], isError: true };
         }
         wroteTo = { layer: 'project', id: projectId };
       } else {
         const existing = getWorkspaceDesignSystem(workspaceId!);
         overwrote = Object.keys(colors).filter((k) => existing?.colors?.[k] !== undefined);
-        if (setWorkspaceDesignSystem(workspaceId!, { colors }) === undefined) {
+        if (setWorkspaceDesignSystem(workspaceId!, { colors, dark: { colors: { ...system.dark } } }) === undefined) {
           return { content: [{ type: 'text', text: `Error: Workspace "${workspaceId}" not found` }], isError: true };
         }
         wroteTo = { layer: 'workspace', id: workspaceId! };
@@ -1019,7 +1024,7 @@ The result also reports the DARK mapping (the Radix pattern: a reversed walk of 
         dark: system.dark,
         ...(preserved.length ? { preservedFromDesignSystem: preserved } : {}),
         ...(overwrote.length ? { overwrote } : {}),
-        note: 'Light system written; reference tokens as $primary-600, $bg-surface, $accent, … (the semantic names are the same vocabulary the structure scaffolds use). "dark" is the reference mapping — dual-theme storage lands in the next slice.',
+        note: 'Light system + dark override layer written. Reference tokens as $primary-600, $bg-surface, $accent, … (the semantic names are the same vocabulary the structure scaffolds use); render the dark theme with theme: "dark" on screenshot/export — canvas_evaluate now contrast-checks both themes automatically.',
       }, null, 2) }] };
     } catch (err) {
       return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
@@ -1121,12 +1126,13 @@ server.tool(
     width: z.number().optional().describe('Viewport width in pixels (default 1440)'),
     height: z.number().optional().describe('Viewport height in pixels (default 900)'),
     scale: z.number().optional().describe('Device scale factor (default 2 for retina)'),
+    theme: z.enum(['light', 'dark']).optional().describe('Render theme — "dark" applies the design system\'s dark token layer (dark.colors overrides); default light. No-op when no dark layer exists.'),
   },
-  async ({ canvasId, format, outputPath, nodeIds, width, height, scale }) => {
+  async ({ canvasId, format, outputPath, nodeIds, width, height, scale, theme }) => {
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
-    const { resolved, renderOpts, fontWarnings } = await prepareRender(canvas);
+    const { resolved, renderOpts, fontWarnings } = await prepareRender(canvas, theme);
     const w = width ?? (typeof canvas.root.width === 'number' ? canvas.root.width : 1440);
     const h = height ?? (typeof canvas.root.height === 'number' ? canvas.root.height : 900);
     const html = renderToHtml(resolved, w, h, canvas, renderOpts);
@@ -1161,12 +1167,13 @@ server.tool(
       height: z.number().describe('Viewport height in pixels'),
     })).optional().describe('Breakpoints to render. Defaults to mobile/tablet/desktop.'),
     scale: z.number().optional().describe('Device scale factor (default 2)'),
+    theme: z.enum(['light', 'dark']).optional().describe('Render theme — "dark" applies the design system\'s dark token layer (dark.colors overrides); default light. No-op when no dark layer exists.'),
   },
-  async ({ canvasId, breakpoints, scale }) => {
+  async ({ canvasId, breakpoints, scale, theme }) => {
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
-    const { resolved, renderOpts, fontWarnings } = await prepareRender(canvas);
+    const { resolved, renderOpts, fontWarnings } = await prepareRender(canvas, theme);
     const defaultBreakpoints = [
       { label: 'mobile', width: 390, height: 844 },
       { label: 'tablet', width: 768, height: 1024 },
@@ -1789,7 +1796,7 @@ Stamping a genre does NOT move the canvas's versionHash (the hash covers design 
 // --- canvas_evaluate ---
 server.tool(
   'canvas_evaluate',
-  `Auto-score a design canvas against quality criteria. Returns an overall score (0-100), category scores, and actionable issues referencing specific node IDs. Categories: spacing, color, typography, structure, consistency (craft), plus "cliche" — the machine-made tells: default purple/indigo accents, gradient/glow overuse, fake browser/phone chrome (traffic-light dots), the hanging eyebrow-beside-heading header, fabricated-looking metrics/testimonials/logos, too many eyebrow labels (template rhythm — an eyebrow above nearly every section), slop copy (stock AI phrasing: filler verbs, scroll cues, placeholder names like "Jane Doe", hype labels), mixed radius systems (radius consistency — too many distinct corner radii), pure black/white (harsh #000000 ink or a stark #ffffff page vs a designed off-black/off-white), and competing accents (accent consistency — more than one accent hue). cliche issues carry a "tell" discriminator and are advisory (warning/info). Plus "coverage" (Phase 24): a BASE canvas whose content carries data — a detected table (empty + loading demanded) or a form of 3+ input controls (error demanded) — gets a directive-blocking WARNING per missing state variant; the result's "coverage" field reports { dataBearing, states, missing }. Designing the state is one canvas_add_variant + one scaffold stamp (empty-state / skeleton-table / skeleton-card); variant canvases themselves and non-data screens get no coverage findings. Modes:
+  `Auto-score a design canvas against quality criteria. Returns an overall score (0-100), category scores, and actionable issues referencing specific node IDs. Categories: spacing, color, typography, structure, consistency (craft), plus "cliche" — the machine-made tells: default purple/indigo accents, gradient/glow overuse, fake browser/phone chrome (traffic-light dots), the hanging eyebrow-beside-heading header, fabricated-looking metrics/testimonials/logos, too many eyebrow labels (template rhythm — an eyebrow above nearly every section), slop copy (stock AI phrasing: filler verbs, scroll cues, placeholder names like "Jane Doe", hype labels), mixed radius systems (radius consistency — too many distinct corner radii), pure black/white (harsh #000000 ink or a stark #ffffff page vs a designed off-black/off-white), and competing accents (accent consistency — more than one accent hue). cliche issues carry a "tell" discriminator and are advisory (warning/info). The color category is DUAL-THEME aware: when the design system has a dark token layer (dark.colors — see set_variables / generate_color_system), contrast is checked in BOTH themes — dark-run issues carry theme: "dark", the category score takes the worse theme, and dark failures point at the dark token layer instead of carrying a literal fix (a node-level literal would break the light theme). WCAG 2.2 remains the gate; WCAG-passing pairs that are perceptually weak by APCA (Lc below ~75 body / ~60 large) get an INFO advisory — APCA is a candidate method, not a standard, and never blocks. Plus "coverage" (Phase 24): a BASE canvas whose content carries data — a detected table (empty + loading demanded) or a form of 3+ input controls (error demanded) — gets a directive-blocking WARNING per missing state variant; the result's "coverage" field reports { dataBearing, states, missing }. Designing the state is one canvas_add_variant + one scaffold stamp (empty-state / skeleton-table / skeleton-card); variant canvases themselves and non-data screens get no coverage findings. Modes:
   - "fast": JSON-only, <100ms, deterministic heuristics only.
   - "detailed": adds Puppeteer-based pixel overlap detection in the consistency category.
   - "llm": fast-mode heuristics plus a vision-model critique against a FIXED rubric (provider picked from FRAMESMITH_LLM_PROVIDER env var, or whichever of ANTHROPIC_API_KEY / OPENAI_API_KEY is set). Adds an "llmCritique" field: { rubric: { hierarchy, execution, specificity, restraint, variety } each {score 1-5, rationale}, score (0-100 derived), summary, suggestions, needsRevision, failingAxes }. The verdict is stamped on the canvas (metadata.critique) + the per-project build log for auditability. Cost: one paid API call per invocation. To CLOSE the loop and auto-fix failing axes, use canvas_revise.

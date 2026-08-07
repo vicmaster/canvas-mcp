@@ -28,6 +28,10 @@ export interface EvaluationIssue {
   category: string;
   /** Present only on `cliche` issues — which machine-made tell fired. */
   tell?: ClicheTell;
+  /** Phase 25 slice D — set on issues from the DARK-theme evaluation pass
+   * (color category dual-runs when a dark token layer exists). Absent =
+   * light/default. */
+  theme?: 'dark';
   severity: IssueSeverity;
   nodeId: string;
   nodeName?: string;
@@ -150,6 +154,32 @@ export function contrastRatio(fg: [number, number, number], bg: [number, number,
   const lighter = Math.max(l1, l2);
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
+}
+
+// Phase 25 slice D — APCA (Accessible Perceptual Contrast Algorithm,
+// 0.0.98G-4g constants). ADVISORY ONLY: APCA sits outside the normative
+// WCAG 3 draft, so Lc values inform (info severity) and never gate — WCAG 2.2
+// remains the blocking check. Notably better than WCAG 2 ratios at predicting
+// legibility on dark backgrounds, which is exactly where the dual-theme pass
+// needs a second opinion.
+export function apcaLc(fg: [number, number, number], bg: [number, number, number]): number {
+  const y = (rgb: [number, number, number]): number => {
+    const ys = 0.2126729 * Math.pow(rgb[0] / 255, 2.4)
+      + 0.7151522 * Math.pow(rgb[1] / 255, 2.4)
+      + 0.072175 * Math.pow(rgb[2] / 255, 2.4);
+    return ys < 0.022 ? ys + Math.pow(0.022 - ys, 1.414) : ys; // black soft-clamp
+  };
+  const yTxt = y(fg);
+  const yBg = y(bg);
+  if (Math.abs(yBg - yTxt) < 0.0005) return 0;
+  if (yBg > yTxt) {
+    // normal polarity: dark text on light background
+    const s = (Math.pow(yBg, 0.56) - Math.pow(yTxt, 0.57)) * 1.14;
+    return s < 0.1 ? 0 : Math.round((s - 0.027) * 1000) / 10;
+  }
+  // reverse polarity: light text on dark background (negative Lc)
+  const s = (Math.pow(yBg, 0.65) - Math.pow(yTxt, 0.62)) * 1.14;
+  return s > -0.1 ? 0 : Math.round((s + 0.027) * 1000) / 10;
 }
 
 // Phase 12 — HSL conversion for hue-based tells (default purple/indigo accent,
@@ -320,7 +350,7 @@ function checkSpacing(entries: NodeEntry[], variables: DesignVariables): CheckRe
   return { score: Math.max(0, Math.min(100, Math.round(score))), issues };
 }
 
-function checkColorContrast(entries: NodeEntry[]): CheckResult {
+function checkColorContrast(entries: NodeEntry[], theme?: 'dark'): CheckResult {
   const issues: EvaluationIssue[] = [];
   const textNodes = entries.filter((e) => e.node.type === 'text');
 
@@ -384,13 +414,37 @@ function checkColorContrast(entries: NodeEntry[]): CheckResult {
         suggestion: `Increase contrast by darkening/lightening the text or background.`,
       };
       const recoverColor = pickHighContrastColor(bg, required);
-      if (recoverColor) {
+      // A dark-run fix would write a LIGHT-theme literal onto the node and
+      // break the other theme — dark failures point at the dark token layer
+      // instead of carrying a mechanical fix.
+      if (recoverColor && theme !== 'dark') {
         issue.fix = {
           op: formatUpdateOp(node.id, { color: recoverColor }),
           rationale: `Switch text color to ${recoverColor} for WCAG AA contrast against ${bgStr}`,
         };
       }
+      if (theme === 'dark') {
+        issue.theme = 'dark';
+        issue.suggestion = 'Fix it in the dark token layer (dark.colors override for the token this text/background resolves through) — a literal node color would break the light theme.';
+      }
       issues.push(issue);
+    } else {
+      // Phase 25 slice D — APCA advisory (info, NEVER blocking): the pair
+      // passes the WCAG 2.2 gate, but perceptual contrast is weak by APCA —
+      // most common with light-on-dark pairs where WCAG 2 ratios flatter.
+      const lc = Math.abs(apcaLc(fg, bg));
+      const apcaBand = isLargeText ? 60 : 75;
+      if (lc > 0 && lc < apcaBand) {
+        issues.push({
+          category: 'color',
+          severity: 'info',
+          nodeId: node.id,
+          nodeName: node.name,
+          ...(theme === 'dark' ? { theme: 'dark' } : {}),
+          message: `APCA advisory: Lc ${lc} (guideline ~${apcaBand} for this size) against ${bgStr}${theme === 'dark' ? ' in the dark theme' : ''} — passes WCAG 2.2 (the gate), but perceptual contrast is weak.`,
+          suggestion: 'Consider a step more contrast. APCA is a candidate method, not a standard — this never blocks.',
+        });
+      }
     }
   }
 
@@ -1492,7 +1546,18 @@ export async function evaluateCanvas(
     results.set('spacing', checkSpacing(rawEntries, mergedTokens));
   }
   if (activeCategories.includes('color')) {
-    results.set('color', checkColorContrast(entries));
+    const light = checkColorContrast(entries);
+    // Phase 25 slice D — a dark token layer means the design ships in two
+    // themes; contrast is checked in BOTH, dark issues tagged. Score takes
+    // the worse theme: a dark-only failure must hurt.
+    const darkLayer = mergedTokens.dark?.colors;
+    if (darkLayer && Object.keys(darkLayer).length > 0) {
+      const darkEntries = buildTreeContext(resolveVariables(canvas.root, mergedTokens, { theme: 'dark' }));
+      const dark = checkColorContrast(darkEntries, 'dark');
+      results.set('color', { score: Math.min(light.score, dark.score), issues: [...light.issues, ...dark.issues] });
+    } else {
+      results.set('color', light);
+    }
   }
   // Phase 25 slice A — detailed-mode layout is computed ONCE and shared by
   // the consistency and typography (measure) checks.
