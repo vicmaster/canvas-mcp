@@ -292,6 +292,7 @@ function mergeDesignSystem(base: DesignVariables | undefined, patch: Partial<Des
   if (patch.radius) out.radius = { ...(out.radius ?? {}), ...patch.radius };
   if (patch.typography) out.typography = { ...(out.typography ?? {}), ...patch.typography };
   if (patch.dark?.colors) out.dark = { colors: { ...(out.dark?.colors ?? {}), ...patch.dark.colors } };
+  if (patch.motion) out.motion = { ...(out.motion ?? {}), ...patch.motion };
   return out;
 }
 

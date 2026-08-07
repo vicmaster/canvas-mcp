@@ -141,6 +141,7 @@ export function setVariables(canvas: Canvas, vars: Partial<DesignVariables>): De
   if (vars.radius) canvas.variables.radius = { ...canvas.variables.radius, ...vars.radius };
   if (vars.typography) canvas.variables.typography = { ...canvas.variables.typography, ...vars.typography };
   if (vars.dark?.colors) canvas.variables.dark = { colors: { ...canvas.variables.dark?.colors, ...vars.dark.colors } };
+  if (vars.motion) canvas.variables.motion = { ...canvas.variables.motion, ...vars.motion };
   return canvas.variables;
 }
 
@@ -214,6 +215,7 @@ export function mergeDesignTokens(...layers: Array<DesignVariables | undefined>)
     if (layer.radius) out.radius = { ...(out.radius ?? {}), ...layer.radius };
     if (layer.typography) out.typography = { ...(out.typography ?? {}), ...layer.typography };
     if (layer.dark?.colors) out.dark = { colors: { ...(out.dark?.colors ?? {}), ...layer.dark.colors } };
+    if (layer.motion) out.motion = { ...(out.motion ?? {}), ...layer.motion };
   }
   return out;
 }
