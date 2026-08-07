@@ -35,7 +35,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 |------|--------------|
 | **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar, multi-series) |
 | **Pattern library** | 11 vetted page archetypes + 5 component scaffolds, all scoring > 95 with zero cliché tells; taxonomy axes + a diversification signal so successive screens vary |
-| **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` · `canvas_add_variant` clones a screen into a linked empty/loading/error state · `canvas_stress` content-perturbation testing (long text, i18n, big numbers, empty/many rows) |
+| **Quality & taste** | `canvas_evaluate` (7 categories incl. cliché tells + state coverage) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` · `canvas_add_variant` clones a screen into a linked empty/loading/error state · `canvas_stress` content-perturbation testing (long text, i18n, big numbers, empty/many rows) · `project_evaluate` rolls up a project's screens for cross-screen consistency (radius/accent drift, token adoption, hand-copied chrome, state coverage) — advisory, never a gate |
 | **Design systems** | Layered `$token`s (workspace ▸ project ▸ canvas), incl. `motion` tokens · style presets · `DESIGN.md` import · `generate_scale` derives a modular type + spacing scale from a named ratio (optional fluid `clamp()` sizes) · `generate_color_system` turns one seed color into OKLCH ramps + AA-checked semantic tokens, dark theme included · dual-theme rendering + evaluation (`theme: "dark"` on screenshot/export, both-theme contrast in `canvas_evaluate` with APCA advisory) · token-detachment lint re-attaches literals that drift from a token |
 | **Primitives** | Lucide + Material Symbols icons · Google Fonts by name · real form controls · components with instance overrides — `create_component` promotes existing work, `copy_nodes` carries subtrees (and their component defs) across canvases |
 | **Import from code** | `canvas_import_html` / `canvas_import_url` — token-mapped, structure-reconstructed · `canvas_sync_from_url` pixel drift · `canvas_check_drift` structural drift · `framesmith verify` / `check-drift` CLI for CI/pre-commit gates, no MCP client needed |
@@ -865,6 +865,25 @@ Finding kinds: `clip` (content cut off — *info* when a designed `text-overflow
 | `screenshots` | bool? | Attach a render of each perturbation that produced warnings |
 
 Returns `{ canvasId, versionHash, perturbations: [{ name, touchedCount, findings } | { name, skipped }], counts, verdict }` — `CLEAN` only with zero warnings. Fix findings with fluid widths, `minWidth` floors, and wrapping (see [Width strategies](docs/GUIDELINES.md#width-strategies) in the authoring guidelines), then re-run. Chrome required (~1 render per perturbation).
+
+### `project_evaluate`
+
+The set-level review no single canvas can give: per-screen score summaries plus checks that only exist **across** screens. Run it when a multi-screen module feels done.
+
+| Finding kind | What it catches |
+|---|---|
+| `radius-drift` | A screen whose corner-radius set shares nothing with the project's common scale |
+| `accent-drift` | An accent hue more than 30° from the project's dominant one |
+| `token-adoption` | A screen styling by hand while the rest of the project references tokens |
+| `copied-chrome` | The same substantial top-level shape hand-copied on 2+ screens instead of component instances — named with the `create_component` + `copy_nodes` fix path |
+| `state-coverage` | The aggregated missing empty/loading/error table across screens |
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | The project whose screens to roll up |
+| `canvasIds` | string[]? | Restrict to specific canvases (e.g. one flow); default: every non-variant canvas |
+
+Returns `{ canvases: [{ canvasId, name, score, blocking, states, missingStates, tokenUsagePercent }], findings, counts, verdict }`. **Advisory, not a gate**: only the per-canvas directives block presenting — this reviews coherence and points at fixes. Every finding names its evidence (which canvases, which values). Variants are excluded from the rows and feed their base's states column. Chrome-free, no API key.
 
 ### `canvas_revise`
 

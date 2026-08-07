@@ -27,6 +27,7 @@ import { computeStructuralDrift, expandInstances } from './drift.js';
 import { applyPerturbation, compareLayouts, PERTURBATION_NAMES, type PerturbationName } from './stress.js';
 import { generateTypeScale, generateSpaceScale, resolveRatio, type RatioName } from './scales.js';
 import { generateColorSystem } from './color-system.js';
+import { evaluateProject } from './project-evaluate.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
 import { evaluateCanvas, relaxedByGenre, knownGenres } from './evaluate.js';
 import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
@@ -2018,6 +2019,38 @@ Finding kinds: clip (content cut off — INFO when a designed text-overflow elli
     } catch (err) {
       return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
     }
+  }
+);
+
+// --- project_evaluate (Phase 26 slice B) ---
+server.tool(
+  'project_evaluate',
+  `The set-level review no single canvas can give: per-screen score summaries plus the checks that only exist ACROSS screens. Run it when a multi-screen module feels done.
+
+Cross-screen findings (each names its evidence — which canvases, which values): radius-drift (a screen whose corner-radius set shares nothing with the project's common scale), accent-drift (an accent hue > 30° from the project's dominant one), token-adoption (a screen styling by hand while the rest reference tokens), copied-chrome (the same substantial top-level shape hand-copied on 2+ screens instead of component instances — the create_component + copy_nodes path is named), and state-coverage (the aggregated missing empty/loading/error table).
+
+THIS IS ADVISORY, NOT A GATE. Only the per-canvas directives (canvas_evaluate score, coverage, feedback) gate presenting — this roll-up reviews coherence and points at fixes; it never blocks. Variant canvases are excluded from the rows (they'd double-count screens) and feed their base's states column instead. Chrome-free, no API key.`,
+  {
+    projectId: z.string().describe('The project whose screens to roll up'),
+    canvasIds: z.array(z.string()).optional().describe('Restrict to these canvases (e.g. the screens of one flow); default: every non-variant canvas in the project'),
+  },
+  async ({ projectId, canvasIds }) => {
+    if (!getProject(projectId)) {
+      return { content: [{ type: 'text', text: `Error: Project "${projectId}" not found. Use project_list to see projects.` }], isError: true };
+    }
+    const rows = listCanvases().filter((r) => r.projectId === projectId && !r.archived && !r.variant && (!canvasIds || canvasIds.includes(r.id)));
+    if (rows.length === 0) {
+      return { content: [{ type: 'text', text: 'Error: no matching canvases in this project (variants are excluded — pass base canvas ids).' }], isError: true };
+    }
+    const canvases: Canvas[] = [];
+    for (const r of rows) {
+      ensureFresh(r.id);
+      const c = getCanvas(r.id);
+      if (c) canvases.push(c);
+    }
+    const statesByCanvas = new Map(rows.map((r) => [r.id, r.variants?.map((v) => v.state) ?? []]));
+    const result = await evaluateProject(canvases, statesByCanvas);
+    return { content: [{ type: 'text', text: JSON.stringify({ projectId, ...result }, null, 2) }] };
   }
 );
 
