@@ -725,7 +725,7 @@ function renderRadio(node: SceneNode, dataAttr: string): string {
 function renderSelect(node: SceneNode, dataAttr: string): string {
   const width = node.width !== undefined ? cssLength(node.width) : 'fit-content';
   const radius = node.cornerRadius !== undefined && typeof node.cornerRadius === 'number' ? node.cornerRadius : 8;
-  const fontSize = node.fontSize ?? 14;
+  const fontSize = typeof node.fontSize === 'number' ? node.fontSize : 14;
   const isPlaceholder = !node.value;
   const textColor = isPlaceholder ? '#9CA3AF' : node.color;
   const frame = [
@@ -880,7 +880,14 @@ function responsivePadding(value: number): string {
   return `clamp(${min}px, ${fluid}vw, ${value}px)`;
 }
 
-function responsiveFontSize(value: number): string {
+// CSS length expressions (clamp()/calc()/rem strings from fluid scale tokens)
+// pass through when they match a safe character set; anything else is dropped.
+const SAFE_CSS_LENGTH = /^[a-zA-Z0-9\s().,%*+\/-]+$/;
+
+function responsiveFontSize(value: number | string): string {
+  if (typeof value === 'string') {
+    return SAFE_CSS_LENGTH.test(value) ? value : '14px';
+  }
   if (value < FONT_SCALE_MIN) return `${value}px`;
   const min = Math.max(16, Math.round(value * 0.6));
   const fluid = ((value / DESIGN_WIDTH) * 100).toFixed(2);

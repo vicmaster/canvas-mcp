@@ -25,12 +25,13 @@ import { listFeedback, resolveFeedback, openFeedbackCount, appendFeedbackDirecti
 import { importHtml, importUrl, renderImportedTree, snapToTokens } from './import.js';
 import { computeStructuralDrift, expandInstances } from './drift.js';
 import { applyPerturbation, compareLayouts, PERTURBATION_NAMES, type PerturbationName } from './stress.js';
+import { generateTypeScale, generateSpaceScale, resolveRatio, type RatioName } from './scales.js';
 import { startViewer, getViewerUrl, setExternalViewerUrl } from './viewer.js';
 import { evaluateCanvas, relaxedByGenre, knownGenres } from './evaluate.js';
 import { judgeCanvas, LLMJudgeUnavailableError } from './llm-judge.js';
 import { reviseCanvas } from './reviser.js';
 import { stampCritique, runReviseLoop } from './critique.js';
-import type { Canvas, FontFace, SceneNode } from './types.js';
+import type { Canvas, DesignVariables, FontFace, SceneNode } from './types.js';
 
 /** Server `instructions` — sent in the MCP initialize response and loaded into
  * the client's context on connect, so a fresh agent has framesmith's operating
@@ -863,10 +864,11 @@ server.tool(
       spacing: z.record(z.number()).optional(),
       radius: z.record(z.number()).optional(),
       typography: z.record(z.object({
-        fontSize: z.number(),
+        fontSize: z.union([z.number(), z.string()]).describe('px number, or a CSS length expression (e.g. a clamp() from generate_scale fluid mode)'),
         fontWeight: z.union([z.string(), z.number()]).optional(),
         fontFamily: z.string().optional(),
         lineHeight: z.union([z.number(), z.string()]).optional(),
+        letterSpacing: z.number().optional().describe('px — applied through $refs like the rest of the token spec'),
       })).optional(),
     }).describe('Design variables to set'),
   },
@@ -877,6 +879,80 @@ server.tool(
     const result = setVariables(canvas, variables);
     touchCanvas(canvasId);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }, ...await warmFontsContent(variables)] };
+  }
+);
+
+// --- generate_scale (Phase 25 slice B) ---
+server.tool(
+  'generate_scale',
+  `Derive, don't hand-pick: a named ratio + a base size → a full modular TYPE scale (text-xs … text-3xl typography tokens) and a PAIRED space scale (space-3xs … space-3xl, md = 1× base), written to the workspace / project / canvas token layer of your choice. The craft defaults are baked into every step — line-height bands (1.5 body / 1.35 subhead / 1.2 display) and negative display tracking — so by construction a generated scale satisfies the tracking advisory, and its sizes are PINNED for the type-scale ratio check (generated = declared = intentional). Usage-dependent checks still apply: measure (line length depends on your containers) and the unique-size count (use the steps a screen needs, not all seven).
+
+Named ratios: minor-second (1.125), major-second (1.2), minor-third (1.25), major-third (1.333), perfect-fourth (1.5), golden (1.618) — or pass a number in (1, 2.2]. Reference the result as fontSize: "$text-lg" (full token spec applies) and gap/padding: "$space-md".
+
+fluid mode (Utopia pattern): each TYPE step becomes a clamp() interpolating from ~85% of its size at minViewport (default 390) to full size at maxViewport (default 1440) — the renderer passes the expression through, and clamp-typed sizes are exempt from the numeric scale checks. The space scale stays static numbers by design (spacing tokens and the spacing checks are number-based).
+
+Merges into the target layer like set_variables (existing token names are overwritten and reported in "overwrote"; other categories untouched). Exactly ONE of canvasId / projectId / workspaceId.`,
+  {
+    ratio: z.union([z.string(), z.number()]).describe('Named ratio ("major-third", "perfect-fourth", …) or a number in (1, 2.2]'),
+    baseSize: z.number().min(10).max(24).optional().describe('Body size the scale pivots on (default 16)'),
+    stepsDown: z.number().int().min(0).max(4).optional().describe('Steps below base (default 2: sm, xs)'),
+    stepsUp: z.number().int().min(0).max(6).optional().describe('Steps above base (default 4: lg … 3xl)'),
+    fluid: z.object({
+      minViewport: z.number().optional().describe('Viewport where each step bottoms out at ~85% (default 390)'),
+      maxViewport: z.number().optional().describe('Viewport where each step reaches full size (default 1440)'),
+    }).optional().describe('Emit Utopia-style clamp() type sizes instead of static px'),
+    canvasId: z.string().optional().describe('Write to this canvas\'s variables'),
+    projectId: z.string().optional().describe('Write to this project\'s design system'),
+    workspaceId: z.string().optional().describe('Write to this workspace\'s design system'),
+  },
+  async ({ ratio, baseSize, stepsDown, stepsUp, fluid, canvasId, projectId, workspaceId }) => {
+    const targets = [canvasId, projectId, workspaceId].filter(Boolean);
+    if (targets.length !== 1) {
+      return { content: [{ type: 'text', text: 'Error: pass exactly ONE of canvasId / projectId / workspaceId — the layer the scale is written to.' }], isError: true };
+    }
+    try {
+      const typography = generateTypeScale({ ratio: ratio as RatioName | number, baseSize, stepsDown, stepsUp, fluid });
+      const spacing = generateSpaceScale(baseSize ?? 16);
+
+      let existing: DesignVariables | undefined;
+      let wroteTo: Record<string, string>;
+      if (canvasId) {
+        ensureFresh(canvasId);
+        const canvas = getCanvas(canvasId);
+        if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
+        existing = canvas.variables;
+        setVariables(canvas, { typography, spacing });
+        touchCanvas(canvasId);
+        wroteTo = { layer: 'canvas', id: canvasId };
+      } else if (projectId) {
+        existing = getProjectDesignSystem(projectId);
+        if (setProjectDesignSystem(projectId, { typography, spacing }) === undefined) {
+          return { content: [{ type: 'text', text: `Error: Project "${projectId}" not found` }], isError: true };
+        }
+        wroteTo = { layer: 'project', id: projectId };
+      } else {
+        existing = getWorkspaceDesignSystem(workspaceId!);
+        if (setWorkspaceDesignSystem(workspaceId!, { typography, spacing }) === undefined) {
+          return { content: [{ type: 'text', text: `Error: Workspace "${workspaceId}" not found` }], isError: true };
+        }
+        wroteTo = { layer: 'workspace', id: workspaceId! };
+      }
+
+      const overwrote = [
+        ...Object.keys(typography).filter((k) => existing?.typography?.[k] !== undefined),
+        ...Object.keys(spacing).filter((k) => existing?.spacing?.[k] !== undefined),
+      ];
+      return { content: [{ type: 'text', text: JSON.stringify({
+        wroteTo,
+        ratio: resolveRatio(ratio as RatioName | number),
+        typography,
+        spacing,
+        ...(overwrote.length ? { overwrote } : {}),
+        note: `Reference sizes as fontSize: "$text-…" (the full token spec — line-height and display tracking — applies through the ref) and spacing as "$space-…". Generated sizes are pinned for the type-scale check.${fluid ? ' Fluid clamp() sizes are exempt from numeric scale checks; the space scale stays static.' : ''}`,
+      }, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
+    }
   }
 );
 

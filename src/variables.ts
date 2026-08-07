@@ -187,7 +187,8 @@ function tokenEquals(a: unknown, b: unknown): boolean {
 
 function fmtToken(cat: string, val: unknown): string {
   if (cat === 'typography' && val && typeof val === 'object' && 'fontSize' in (val as object)) {
-    return `${(val as { fontSize: number }).fontSize}px`;
+    const fs = (val as { fontSize: number | string }).fontSize;
+    return typeof fs === 'number' ? `${fs}px` : String(fs);
   }
   return String(val);
 }

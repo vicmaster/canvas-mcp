@@ -1024,7 +1024,7 @@ export function snapToTokens(root: SceneNode, vars: DesignVariables, report: Imp
     if (typeof node.cornerRadius === 'number') matchScale(node, 'cornerRadius', node.cornerRadius, vars.radius);
     if (typeof node.fontSize === 'number') {
       for (const [name, t] of Object.entries(vars.typography ?? {})) {
-        if (Math.abs(t.fontSize - node.fontSize) <= 1) {
+        if (typeof t.fontSize === 'number' && Math.abs(t.fontSize - node.fontSize) <= 1) {
           report.scaleMatches.push({ nodeId: node.id, prop: 'fontSize', value: node.fontSize, token: `$${name}` });
           break;
         }

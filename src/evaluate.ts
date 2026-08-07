@@ -368,7 +368,7 @@ function checkColorContrast(entries: NodeEntry[]): CheckResult {
     // flagged, and keeps the displayed number honest (no 1-decimal "4.5" for a
     // value that actually failed at 4.46).
     const ratio = Math.round(contrastRatio(fg, bg) * 100) / 100;
-    const fontSize = node.fontSize ?? 16;
+    const fontSize = typeof node.fontSize === 'number' ? node.fontSize : 16; // clamp strings: treat as body size for the contrast threshold
     const fontWeight = typeof node.fontWeight === 'number' ? node.fontWeight : 400;
     const isLargeText = fontSize >= 18 || (fontSize >= 14 && fontWeight >= 700);
     const required = isLargeText ? 3 : 4.5;
@@ -504,6 +504,7 @@ function checkTypography(entries: NodeEntry[], variables: DesignVariables = {}, 
   };
   for (const e of textNodes) {
     const content = typeof e.node.content === 'string' ? e.node.content : '';
+    if (typeof e.node.fontSize === 'string') continue; // fluid/clamp — real size unknown, never guess
     const size = typeof e.node.fontSize === 'number' ? e.node.fontSize : 14;
     if (content.length <= 120 || size >= 18) continue;
     const width = layoutWidth.get(e.node.id) ?? nearestFixedWidth(e) ?? ctx.rootWidth ?? 1440;
@@ -1049,7 +1050,7 @@ function tellHangingHeader(ctx: ClicheCtx): EvaluationIssue[] {
   const issues: EvaluationIssue[] = [];
 
   const isEyebrow = (n: SceneNode): boolean => {
-    if (n.type === 'text') return (n.fontSize ?? 16) <= 14;
+    if (n.type === 'text') return (typeof n.fontSize === 'number' ? n.fontSize : 16) <= 14;
     if (n.type === 'frame') {
       const w = typeof n.width === 'number' ? n.width : (n.width === 'fit-content' ? 0 : Infinity);
       const oneShortText = (n.children?.length ?? 0) === 1 && n.children![0].type === 'text';
@@ -1057,7 +1058,7 @@ function tellHangingHeader(ctx: ClicheCtx): EvaluationIssue[] {
     }
     return false;
   };
-  const isHeading = (n: SceneNode): boolean => n.type === 'text' && (n.fontSize ?? 16) >= 28;
+  const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= 28;
 
   for (const { node } of ctx.entries) {
     if (node.layout !== 'horizontal' || !node.children || node.children.length !== 2) continue;
@@ -1131,12 +1132,12 @@ function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
 
   const isEyebrowText = (n: SceneNode): boolean => {
     if (n.type !== 'text' || typeof n.content !== 'string' || n.content.trim().length === 0) return false;
-    if ((n.fontSize ?? 16) > 14) return false;
+    if ((typeof n.fontSize === 'number' ? n.fontSize : 16) > 14) return false;
     // The signature: small text that is uppercased or letter-spaced (a label,
     // not body copy). Either property qualifies; both is the canonical eyebrow.
     return n.textTransform === 'uppercase' || (typeof n.letterSpacing === 'number' && n.letterSpacing > 0);
   };
-  const isHeading = (n: SceneNode): boolean => n.type === 'text' && (n.fontSize ?? 16) >= 28;
+  const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= 28;
 
   const eyebrowCount = ctx.entries.filter((e) => isEyebrowText(e.node)).length;
   const sectionCount = ctx.entries.filter((e) => isHeading(e.node)).length;
