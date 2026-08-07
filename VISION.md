@@ -477,9 +477,9 @@ framesmith designs the happy path of a single static frame with ideal data — b
 - [x] Slice B — loading/empty primitives: `skeleton` node type (token-derived, static in screenshots) + `empty-state` / `skeleton-table` / `skeleton-card` scaffolds
 - [x] Slice C — coverage teeth: new `coverage` evaluate category — data-bearing screens warn per missing empty/loading (error for forms), directive-blocking
 - [x] Slice D — stress testing: `src/stress.ts` perturbation engine (long-text / i18n / big-numbers / empty / many) + `computeLayout` overflow capture + `canvas_stress`
-- [ ] Slice E — agent surfaces: "design every state" + "stress before present" in the workflow, GUIDELINES section, discoverability pins
+- [x] Slice E — agent surfaces: "design every state" + "stress before present" in the workflow, GUIDELINES section, discoverability pins
 
-_Full spec-driven breakdown in [`docs/specs/PHASE-24-SPEC.md`](docs/specs/PHASE-24-SPEC.md)._
+_Full spec-driven breakdown in [`docs/specs/PHASE-24-SPEC.md`](docs/specs/PHASE-24-SPEC.md). All slices shipped — Phase 24 complete._
 
 ### Issue-driven improvements (post-v1.8)
 
