@@ -936,7 +936,7 @@ const emptyState: Structure = {
           // dark accent in light mode, near-black on the light accent in dark
           // mode (the tier() CTA convention — a literal white breaks in dark).
           { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: COLOR.bgPrimary },
-          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 13, fontWeight: 600, color: COLOR.bgPrimary },
+          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 14, fontWeight: 600, color: COLOR.bgPrimary },
         ],
       },
     ],

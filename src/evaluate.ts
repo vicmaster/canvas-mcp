@@ -1396,7 +1396,11 @@ function tellPureBlackWhite(ctx: ClicheCtx): EvaluationIssue[] {
       });
     }
     // Pure-black / pure-white BACKGROUND surface — suggest-only (deliberate?).
-    if (isBackgroundSurface(node)) {
+    // A fill referenced through a $token is a design-system decision by
+    // construction (the accent-hue precedent) — only literal hex flags.
+    const rawFill = ctx.rawById.get(node.id)?.fill;
+    const viaToken = typeof rawFill === 'string' && rawFill.startsWith('$');
+    if (isBackgroundSurface(node) && !viaToken) {
       const fillHex = isOpaque(node.fill) ? exactHex(node.fill) : null;
       if (fillHex === '#000000') {
         issues.push({
