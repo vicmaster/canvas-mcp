@@ -254,13 +254,31 @@ export interface CanvasSummary {
   /** Phase 21 slice C — open point-and-tell comments. Present only when > 0
    * so summaries stay lean; open feedback blocks presenting the canvas. */
   openFeedback?: number;
+  /** Phase 24 slice A — present on a state-variant canvas: which base it
+   * belongs to and which state it designs. */
+  variant?: { of: string; state: string };
+  /** Phase 24 slice A — present on a base canvas that has state variants:
+   * the designed states and their canvas ids. */
+  variants?: { state: string; canvasId: string }[];
 }
 
 export function listCanvases(): CanvasSummary[] {
+  // Roll designed states up onto their base rows so one listing answers
+  // "which states exist for this screen" (FR-A2).
+  const variantsByBase = new Map<string, { state: string; canvasId: string }[]>();
+  for (const c of store.values()) {
+    const v = c.metadata?.variant;
+    if (!v || c.archived) continue;
+    const arr = variantsByBase.get(v.of) ?? [];
+    arr.push({ state: v.state, canvasId: c.id });
+    variantsByBase.set(v.of, arr);
+  }
   return Array.from(store.values()).map((c) => {
     // Inline count (not feedback.ts's openFeedbackCount) — feedback.ts imports
     // from this module, so using the helper here would be a circular import.
     const openFeedback = (c.metadata?.feedback ?? []).filter((e) => !e.resolvedAt).length;
+    const variant = c.metadata?.variant;
+    const variants = variantsByBase.get(c.id);
     return {
       id: c.id,
       name: c.name,
@@ -270,6 +288,8 @@ export function listCanvases(): CanvasSummary[] {
       projectId: c.projectId,
       archived: c.archived === true,
       ...(openFeedback > 0 ? { openFeedback } : {}),
+      ...(variant ? { variant: { of: variant.of, state: variant.state } } : {}),
+      ...(variants ? { variants } : {}),
     };
   });
 }
@@ -463,12 +483,54 @@ export function deleteNode(root: SceneNode, nodeId: string): void {
   result.parent.children!.splice(result.index, 1);
 }
 
-function deepCloneWithNewIds(node: SceneNode, overrides?: Partial<SceneNode>): SceneNode {
+function deepCloneWithNewIds(node: SceneNode, overrides?: Partial<SceneNode>, idMap?: Record<string, string>): SceneNode {
   const clone: SceneNode = { ...node, id: nanoid(10), ...overrides };
+  if (idMap) idMap[node.id] = clone.id;
   if (node.children) {
-    clone.children = node.children.map((child) => deepCloneWithNewIds(child));
+    clone.children = node.children.map((child) => deepCloneWithNewIds(child, undefined, idMap));
   }
   return clone;
+}
+
+/** Phase 24 slice A (FR-A1) — clone a base canvas into a linked state variant.
+ * The variant is a full sibling canvas (re-keyed node IDs, same project,
+ * copied tokens/components/fonts) stamped with metadata.variant. Provenance
+ * (structure/preset/genre — WHAT the screen is) carries over; feedback and
+ * critique (per-canvas judgments) deliberately don't. Adding a variant to a
+ * canvas that is itself a variant links to the ROOT base (spec C6: variant
+ * trees deeper than one level have no UX meaning). */
+export function addVariant(canvasId: string, state: string): { canvas: Canvas; idMap: Record<string, string> } {
+  ensureFresh(canvasId);
+  let base = store.get(canvasId);
+  if (!base) throw new Error(`Canvas "${canvasId}" not found`);
+  const link = base.metadata?.variant;
+  if (link) {
+    ensureFresh(link.of);
+    const root = store.get(link.of);
+    if (!root) throw new Error(`Canvas "${canvasId}" is a variant of "${link.of}", which no longer exists — add the variant to a live base canvas.`);
+    base = root;
+  }
+  const normalized = state.trim();
+  if (!normalized) throw new Error('state must be a non-empty string (e.g. "empty", "loading", "error")');
+  const baseId = base.id;
+  const dup = Array.from(store.values()).find(
+    (c) => c.metadata?.variant?.of === baseId && c.metadata.variant.state === normalized && !c.archived,
+  );
+  if (dup) throw new Error(`"${base.name}" already has a "${normalized}" variant (${dup.id}) — edit that canvas instead of adding a second.`);
+
+  const idMap: Record<string, string> = {};
+  const clonedRoot = deepCloneWithNewIds(base.root, undefined, idMap);
+  const canvas = createCanvas(`${base.name} · ${normalized}`, base.projectId);
+  canvas.root = clonedRoot;
+  canvas.variables = structuredClone(base.variables);
+  canvas.components = structuredClone(base.components);
+  if (base.fonts) canvas.fonts = structuredClone(base.fonts);
+  canvas.metadata = {
+    ...(base.metadata?.provenance ? { provenance: structuredClone(base.metadata.provenance) } : {}),
+    variant: { of: baseId, state: normalized, at: new Date().toISOString() },
+  };
+  touchCanvas(canvas.id);
+  return { canvas, idMap };
 }
 
 export function copyNode(root: SceneNode, sourceId: string, parentId: string, overrides?: Partial<SceneNode>): SceneNode {

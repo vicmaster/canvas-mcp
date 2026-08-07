@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { createCanvas, getCanvas, listCanvases, findNode, touchCanvas, loadPersistedCanvases, archiveCanvas, unarchiveCanvas, moveCanvas, deleteCanvas, countCanvasesInProject, ensureFresh, collectMatchingNodes, replaceMatchingProperties, findNodesDetailed, setCanvasGenre } from './scene-graph.js';
+import { createCanvas, getCanvas, listCanvases, findNode, touchCanvas, loadPersistedCanvases, archiveCanvas, unarchiveCanvas, moveCanvas, deleteCanvas, countCanvasesInProject, ensureFresh, collectMatchingNodes, replaceMatchingProperties, findNodesDetailed, setCanvasGenre, addVariant } from './scene-graph.js';
 import { canvasVersionHash } from './version.js';
 import { loadPersistedWorkspaces, ensureDefaultWorkspaceAndProject, createWorkspace, listWorkspaces, renameWorkspace, deleteWorkspace, createProject, getProject, getWorkspace, listProjects, renameProject, deleteProject, setWorkspaceDesignSystem, getWorkspaceDesignSystem, setProjectDesignSystem, getProjectDesignSystem, getCanvasTokens, getInheritedTokens, loadRepoWorkspace } from './workspaces.js';
 import { DEFAULT_PROJECT_ID, DEFAULT_WORKSPACE_ID } from './types.js';
@@ -174,7 +174,7 @@ server.tool(
 // --- canvas_list ---
 server.tool(
   'canvas_list',
-  'List canvases. By default returns all non-archived canvases. Filter by `projectId` to scope to one project. Set `includeArchived: true` to include archived canvases in the result. A row carrying `openFeedback: n` has open point-and-tell comments from the user waiting — read them with get_feedback before working on (or presenting) that canvas. Every row carries a `versionHash` — the design-content hash canvas_version checks approvals against, so a gate can populate its records from this listing alone.',
+  'List canvases. By default returns all non-archived canvases. Filter by `projectId` to scope to one project. Set `includeArchived: true` to include archived canvases in the result. A row carrying `openFeedback: n` has open point-and-tell comments from the user waiting — read them with get_feedback before working on (or presenting) that canvas. Every row carries a `versionHash` — the design-content hash canvas_version checks approvals against, so a gate can populate its records from this listing alone. State variants (canvas_add_variant): a variant row carries `variant: { of, state }`; its base row carries `variants: [{ state, canvasId }]` — one listing answers "which states are designed for this screen".',
   {
     projectId: z.string().optional().describe('Only list canvases in this project'),
     includeArchived: z.boolean().optional().describe('Include archived canvases in the result (default false)'),
@@ -186,6 +186,41 @@ server.tool(
     return {
       content: [{ type: 'text', text: JSON.stringify(canvases, null, 2) }],
     };
+  }
+);
+
+// --- canvas_add_variant (Phase 24 slice A) ---
+server.tool(
+  'canvas_add_variant',
+  `Clone a screen into a linked STATE VARIANT — the empty / loading / error version of a canvas, as its own sibling canvas. Real UX lives in these states, and a data screen isn't done until they're designed; this makes starting one a single call instead of a rebuild.
+
+The clone is a full canvas (re-keyed node IDs, same project, tokens/components/fonts copied, provenance/genre carried over — feedback and critique stay behind) named "<base> · <state>" and stamped with metadata.variant = { of, state }. The result's idMap maps every base node id to its clone, so follow-up edits target the right nodes immediately: delete the data rows, stamp an empty-state scaffold, adjust copy. Adding a variant to a canvas that is itself a variant links to the ROOT base (variants never nest); one canvas per state per base — a duplicate state errors instead of forking.
+
+state is a free string; "empty", "loading", and "error" are the recommended vocabulary (they're what the viewer groups and what coverage checks will look for). canvas_list shows the designed states on the base row (variants: [{ state, canvasId }]).`,
+  {
+    canvasId: z.string().describe('The base canvas to clone (a variant id also works — it resolves to the root base)'),
+    state: z.string().min(1).describe('The state this variant designs — "empty", "loading", "error" recommended; free string accepted'),
+  },
+  async ({ canvasId, state }) => {
+    try {
+      const { canvas, idMap } = addVariant(canvasId, state);
+      const viewerUrl = getViewerUrl();
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({
+            canvasId: canvas.id,
+            name: canvas.name,
+            state: canvas.metadata!.variant!.state,
+            of: canvas.metadata!.variant!.of,
+            idMap,
+            next: 'Design the state: edit via batch_design using the idMap ids (e.g. delete data rows and stamp an empty-state pattern), then evaluate as usual — variants hold the same > 95 bar.',
+          }, null, 2) },
+          ...(viewerUrl ? [{ type: 'text' as const, text: `View live: ${viewerUrl}/canvas/${canvas.id}` }] : []),
+        ],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${(err as Error).message}` }], isError: true };
+    }
   }
 );
 

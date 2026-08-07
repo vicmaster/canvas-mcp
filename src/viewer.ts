@@ -295,6 +295,12 @@ export async function startViewer(port: number): Promise<number> {
  *  across gallery / project / archive / detail pages. Single source of truth
  *  for the warm-amber-on-warm-dark direction established by the slice 5 mock. */
 const THEME_CSS = `
+  /* Phase 24 slice A — state chips: a screen's designed states (default /
+     empty / loading / …) cross-linking on cards and the detail toolbar. */
+  .state-chips { display: inline-flex; gap: 4px; align-items: center; }
+  .state-chip { font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: 999px; color: var(--text-secondary); background: var(--surface-elevated); border: 1px solid var(--border-subtle); text-decoration: none; white-space: nowrap; }
+  a.state-chip:hover { color: var(--text-primary); border-color: var(--border); }
+  .state-chip--active { color: var(--text-primary); border-color: var(--accent); }
   :root {
     --bg-0: #09070a;
     --bg-1: #0d0b0a;
@@ -475,7 +481,12 @@ export async function renderProjectPage(projectId: string, port: number): Promis
   const wsName = ws?.name ?? 'Personal';
 
   const canvases = listCanvases().filter((c) => c.projectId === projectId && !c.archived);
-  const cards = (await Promise.all(canvases.map(async (c) => {
+  // Phase 24 slice A — a screen and its state variants are ONE card: variants
+  // whose base is in this listing fold into the base card as chips. A variant
+  // whose base is missing (orphan) or lives elsewhere stays a standalone card.
+  const present = new Set(canvases.map((c) => c.id));
+  const shown = canvases.filter((c) => !(c.variant && present.has(c.variant.of)));
+  const cards = (await Promise.all(shown.map(async (c) => {
     const canvas = getCanvas(c.id)!;
     const w = typeof canvas.root.width === 'number' ? canvas.root.width : 1440;
     const h = typeof canvas.root.height === 'number' ? canvas.root.height : 900;
@@ -493,7 +504,25 @@ export async function renderProjectPage(projectId: string, port: number): Promis
             <span class="thumb-empty-icon" hidden>Empty canvas</span>
           </div>`
       : `<iframe src="/canvas/${c.id}/html" scrolling="no" loading="lazy"></iframe>`;
-    return `
+    const stateChips = c.variants?.length
+      ? `<div class="state-chips card-states">
+          <span class="state-chip state-chip--active">default</span>
+          ${c.variants.map((v) => `<a class="state-chip" href="/canvas/${v.canvasId}">${esc(v.state)}</a>`).join('')}
+        </div>`
+      : '';
+    return stateChips
+      ? `
+      <div class="card">
+        <a href="/canvas/${c.id}" class="card-link">
+          <div class="thumb${isEmpty ? ' thumb--empty' : ''}">${scoreBadge}${thumbBody}</div>
+          <div class="info">
+            <div class="name">${esc(c.name)}</div>
+            <div class="meta">${w} x ${h} &middot; ${esc(date)}</div>
+          </div>
+        </a>
+        ${stateChips}
+      </div>`
+      : `
       <a href="/canvas/${c.id}" class="card">
         <div class="thumb${isEmpty ? ' thumb--empty' : ''}">${scoreBadge}${thumbBody}</div>
         <div class="info">
@@ -560,6 +589,8 @@ ${FAVICON_HTML}
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(264px, 1fr)); gap: 20px; padding: 28px 36px 36px; }
   .card { background: var(--surface); border-radius: 12px; overflow: hidden; text-decoration: none; color: inherit; transition: transform 0.18s ease, box-shadow 0.18s ease; box-shadow: 0 0 0 1px var(--border-rim) inset, 0 4px 12px -2px rgba(0,0,0,0.4); }
   .card:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(245,158,11,0.30) inset, 0 8px 20px -4px rgba(0,0,0,0.5); }
+  .card-link { display: block; text-decoration: none; color: inherit; }
+  .card-states { padding: 0 14px 12px; }
   .thumb { width: 100%; aspect-ratio: 16/10; overflow: hidden; background: var(--bg-0); position: relative; }
   .thumb iframe { width: 1440px; height: 900px; border: none; transform-origin: 0 0; transform: scale(0.222); pointer-events: none; position: absolute; top: 0; left: 0; }
   .thumb--empty { background: #15110b; }
@@ -1066,6 +1097,35 @@ export async function renderDetailPage(canvas: Canvas, port: number): Promise<st
     if (parts.length) provChip = `<span class="prov" title="Provenance — the structure / preset / axes that produced this canvas"><b>◆</b>${parts.join(' · ')}</span>`;
   }
 
+  // State chips (Phase 24 slice A) — a screen and its designed states cross-
+  // link: on a base with variants, "default" (active) + each state; on a
+  // variant, the base ("default") + every sibling state. Orphan-safe: a
+  // variant whose base is gone simply shows no chips.
+  const rows = listCanvases();
+  const selfRow = rows.find((r) => r.id === canvas.id);
+  let stateChips = '';
+  {
+    const chip = (label: string, id: string | null) => id === null
+      ? `<span class="state-chip state-chip--active">${esc(label)}</span>`
+      : `<a class="state-chip" href="/canvas/${id}">${esc(label)}</a>`;
+    if (selfRow?.variants?.length) {
+      stateChips = `<span class="state-chips" title="Designed states of this screen">${[
+        chip('default', null),
+        ...selfRow.variants.map((v) => chip(v.state, v.canvasId)),
+      ].join('')}</span>`;
+    } else if (selfRow?.variant) {
+      const base = rows.find((r) => r.id === selfRow.variant!.of);
+      if (base) {
+        const siblings = (base.variants ?? []).filter((v) => v.canvasId !== canvas.id);
+        stateChips = `<span class="state-chips" title="Designed states of this screen">${[
+          chip('default', base.id),
+          ...siblings.map((v) => chip(v.state, v.canvasId)),
+          chip(selfRow.variant.state, null),
+        ].join('')}</span>`;
+      }
+    }
+  }
+
   // Critique verdict chip (Phase 13) — latest rubric overall + needs-revision
   // flag. Hidden when a canvas has never been judged.
   const crit = canvas.metadata?.critique;
@@ -1254,6 +1314,7 @@ ${FAVICON_HTML}
     <a href="/project/${canvas.projectId}">&larr; Back</a>
     <span class="title">${esc(canvas.name)}</span>
     <span class="dim">${w} x ${h}</span>
+    ${stateChips}
     ${provChip}
     ${verdictChip}
     <div class="spacer"></div>
