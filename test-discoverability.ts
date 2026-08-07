@@ -164,6 +164,33 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── 9. Phase 24 vocabulary is surfaced where agents look ─────────────────────
+// The coverage category, the demanded state names (parsed from the
+// COVERAGE_DEMANDS table), and the stress perturbation names (live import)
+// must stay documented — a warning an agent can't interpret is noise, and an
+// undocumented perturbation never gets run.
+{
+  const { PERTURBATION_NAMES } = await import('./src/stress.js');
+  expect('perturbation names found', PERTURBATION_NAMES.length >= 5, PERTURBATION_NAMES.join(', '));
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    const missing = PERTURBATION_NAMES.filter((p: string) => !surface[1].includes(p));
+    expect(`every perturbation named in ${surface[0]}`, missing.length === 0, missing.join(', '));
+  }
+
+  const evaluateSrc = readFileSync('src/evaluate.ts', 'utf-8');
+  const demandsTable = evaluateSrc.match(/COVERAGE_DEMANDS[\s\S]*?\n\];/)?.[0] ?? '';
+  const states = [...new Set([...demandsTable.matchAll(/demands: \[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1])))];
+  expect('demanded states found', states.length >= 3, states.join(', '));
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    const missing = states.filter((s) => !surface[1].includes(`"${s}"`) && !surface[1].includes(`\`${s}\``));
+    expect(`every demanded state named in ${surface[0]}`, missing.length === 0, missing.join(', '));
+  }
+
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    expect(`coverage category documented in ${surface[0]}`, /coverage/.test(surface[1]));
+  }
+}
+
 let allPass = true;
 for (const c of checks) {
   if (!c.ok) allPass = false;
