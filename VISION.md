@@ -481,6 +481,19 @@ framesmith designs the happy path of a single static frame with ideal data — b
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-24-SPEC.md`](docs/specs/PHASE-24-SPEC.md). All slices shipped — Phase 24 complete._
 
+### Phase 25 — Craft depth: type & color (v1.12)
+
+The design-quality cluster's typographic + chromatic half (points 3, 4, 7, 8, 9, 10, 11): the token system gets generative and typographically serious. Fix the typography-token lie ($refs resolve fontSize only), make numerics/measure/tracking craft defaults, derive scales from a ratio and full dual-theme color systems from one seed (perceptual OKLCH ramps, matched neutral, status colors), render + verify contrast in BOTH themes (APCA advisory, WCAG 2.2 gate), and catch token detachment + ad-hoc motion.
+
+- [ ] Slice A — typography correctness: full $token resolution (weight/family/lineHeight/letterSpacing), tabular numerals, measure + tracking checks
+- [ ] Slice B — `generate_scale`: modular type + paired space tokens from a named ratio, optional fluid clamp() forms
+- [ ] Slice C — `src/color-system.ts` + `generate_color_system`: one seed → OKLCH ramps 50–900, matched neutral, status colors, semantic mapping
+- [ ] Slice D — dual theme: sparse `dark` token layer, theme param on render/evaluate/viewer, both-mode contrast + APCA info
+- [ ] Slice E — token-detachment lint (literal = token → $ref autofix) + motion token category
+- [ ] Slice F — agent surfaces: "derive, don't hand-pick" workflow + discoverability pins
+
+_Full spec-driven breakdown in [`docs/specs/PHASE-25-SPEC.md`](docs/specs/PHASE-25-SPEC.md). Phase 26 ("Beyond one canvas") takes the cluster's remainder: grid authoring, project-level consistency, multi-screen flow critique._
+
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
