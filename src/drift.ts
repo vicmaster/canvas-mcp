@@ -109,9 +109,16 @@ function detectTable(node: SceneNode): { columnCount: number; headers: string[];
   // bento tiles with inner structure would otherwise pattern-match as
   // rows-of-cells (drift/coverage/stress all share this detector).
   if (node.layout === 'grid') return null;
-  const rows = node.children.filter((c) => c.type === 'frame' && (c.children?.length ?? 0) >= 2);
+  // A table ROW is horizontal by nature — cells sit beside each other. A
+  // vertical child is a section/group, and a stack of those (a settings
+  // column, a sidebar) must never read as a table (Phase 27 dogfood: the
+  // sidebar and the sectioned settings column both false-positived here).
+  // Import-named Tables keep the trusted loose shape.
+  const named0 = node.name === 'Table';
+  const rows = node.children.filter((c) => c.type === 'frame' && (c.children?.length ?? 0) >= 2
+    && (named0 || c.layout === 'horizontal'));
   if (rows.length < 2) return null;
-  const named = node.name === 'Table';
+  const named = named0;
   // Modal cell count across candidate rows; require it to dominate unless the
   // frame is an import-named Table (trusted shape).
   const countFreq = new Map<number, number>();

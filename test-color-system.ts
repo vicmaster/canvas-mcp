@@ -71,6 +71,11 @@ const aa = (fg: string, bg: string) => contrastRatio(rgb(fg), rgb(bg)) >= 4.5;
   // each is darkened from the shared band until it clears AA on white.
   const failingText = Object.entries(status).filter(([, hex]) => !aa(hex, '#FFFFFF'));
   check('status colors read as TEXT on white (AA)', failingText.length === 0, failingText.map(([k, hex]) => `${k}: ${hex}`).join('; '));
+  // Second dogfood fix: the page surface (bg-primary = neutral-50) is the
+  // stricter light target — status text must clear AA there too.
+  const sys = generateColorSystem('#0E7490');
+  const failingOnPage = Object.entries(sys.status).filter(([, hex]) => !aa(hex, sys.light['bg-primary']));
+  check('status colors read as TEXT on the off-white page (AA)', failingOnPage.length === 0, failingOnPage.map(([k, hex]) => `${k}: ${hex}`).join('; '));
   const hueDrift = (['success', 'warning', 'danger'] as const).map((k) => {
     const target = { success: 150, warning: 75, danger: 27 }[k];
     return Math.abs(hexToOklch(status[k]).h - target);

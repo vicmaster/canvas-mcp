@@ -133,6 +133,20 @@ Authoring rules:
 
 Merge semantics are per-category: a project that only sets `colors` doesn't reset the workspace's `spacing`/`radius`/`typography`. A canvas that only overrides `colors.primary` keeps every other workspace color.
 
+## Designing with character
+
+A design language is a set of COMMITTED choices, and `generate_design_system` makes them for you — your job is to spend them well.
+
+**Pick the personality like a genre, not a mood.** `technical` for developer tools, admin panels, and B2B products (crisp geometry, tight tracking, quick motion). `editorial` for marketing and content (a serif display voice, generous air, near-sharp corners). `soft` for consumer products and onboarding (rounded, warm, springy). `data-dense` for dashboards, tables, and monitoring (a 13px pivot, a mono `$figures` role for numbers, near-flat depth). Same seed, different personality = a visibly different product — so choose deliberately and stay with it across the project.
+
+**Spend the accent in one confident moment per screen.** The generated system keeps the accent AA-safe everywhere, but discipline is what makes it read as designed: one primary action, one active nav item, one focal chart series. If the accent appears in more than a few places, everything reads as equally important, which is the same as nothing being important. (The accent-consistency tell catches competing hues; restraint within ONE hue is on you.)
+
+**Use elevation as meaning, not decoration.** `$elevation.flat` for resting cards, `raised` for the one surface that should come forward (the active card, a dropdown), `floating` for menus and popovers, `overlay` for modals. A screen where everything is raised is flat again. The dark layer re-states each depth automatically — never hand-tune shadows per theme.
+
+**Let the roles do the typography.** `$title` for the screen title, `$heading` for section heads, `$body` for prose, `$label` for control and form labels, `$caption` for metadata, `$figures` (when the personality ships one) for numbers that deserve tabular alignment. The roles carry the personality's face, weight, and tracking — a screen that references roles re-voices itself when the personality changes; a screen full of literal font sizes doesn't.
+
+**Motion comes from tokens.** `transition: "$motion.fast"` for hover/focus feedback, `"$motion.base"` for state changes, `"$motion.slow"` for surfaces entering/leaving. The personality sets the temperament; scattering literal millisecond values breaks it.
+
 ## Components & reuse
 
 **Shared chrome is a component, not a copy-paste.** When the same chunk exists (or is about to exist) twice — an app shell, a stat card, a table row — promote it and instance it instead of re-authoring:

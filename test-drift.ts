@@ -26,7 +26,10 @@ const control = (type: 'toggle' | 'checkbox' | 'radio' | 'select', extra: Partia
 
 /** A 2+-column table: header row + data rows, all same cell count. */
 function table(headers: string[], rows: string[][], name?: string): SceneNode {
-  const row = (cells: string[]) => frame(cells.map((c) => frame([text(c)])), { name: name ? 'Row' : undefined });
+  // Rows are horizontal — cells beside each other. (A layout-less frame
+  // stacks children vertically, which never renders as a table; the detector
+  // requires the horizontal signature since Phase 27.)
+  const row = (cells: string[]) => frame(cells.map((c) => frame([text(c)])), { layout: 'horizontal', ...(name ? { name: 'Row' } : {}) });
   return frame([row(headers), ...rows.map(row)], name ? { name } : {});
 }
 

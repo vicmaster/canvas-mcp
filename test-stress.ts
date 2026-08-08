@@ -22,7 +22,7 @@ const frame = (children: SceneNode[], extra: Partial<SceneNode> = {}): SceneNode
 const doc = (children: SceneNode[]): SceneNode => ({ id: 'document', type: 'document', children } as SceneNode);
 
 function table(headers: string[], rows: string[][]): SceneNode {
-  const row = (cells: string[]) => frame(cells.map((c) => frame([text(c)])));
+  const row = (cells: string[]) => frame(cells.map((c) => frame([text(c)])), { layout: 'horizontal' });
   return frame([row(headers), ...rows.map(row)]);
 }
 const texts = (root: SceneNode): string[] => {
