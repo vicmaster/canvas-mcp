@@ -245,6 +245,14 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── Phase 27 slice C: the usability category ─────────────────────────────────
+{
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    expect(`usability category in ${surface[0]}`, surface[1].includes('usability'));
+    expect(`hit-target floor in ${surface[0]}`, surface[1].includes('24px') && surface[1].includes('2.5.8'));
+  }
+}
+
 // ── Phase 27 slice A: personalities + elevation vocabulary ───────────────────
 {
   const { PERSONALITY_NAMES } = await import('./src/design-language.js');

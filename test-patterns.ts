@@ -42,7 +42,7 @@ async function main() {
       const ev = await evaluateCanvas(canvas, {
         mode: 'fast',
         genre: theme === 'default' ? undefined : theme,
-        categories: ['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche'],
+        categories: ['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche', 'usability'],
       });
       const tells = ev.issues.filter((i) => i.category === 'cliche');
       const ok = ev.overallScore > BAR && tells.length === 0;

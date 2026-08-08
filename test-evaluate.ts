@@ -54,6 +54,7 @@ deep7=I(deep6, {type: "frame"})
 deep8=I(deep7, {type: "frame"})
 deep9=I(deep8, {type: "frame"})
 I(deep9, {type: "text", content: "Deeply nested", fontSize: 14, color: "#000000"})
+I("document", {type: "checkbox", width: 14, height: 14})
   `, canvas);
 
   const result = await evaluateCanvas(canvas, { mode: 'fast' });
