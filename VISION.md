@@ -505,6 +505,17 @@ The design-quality cluster's final third (points 5, 6, 12): everything framesmit
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-26-SPEC.md`](docs/specs/PHASE-26-SPEC.md). All slices shipped — Phase 26 complete, and with it all 12 points of the design-quality cluster (Phases 24–26)._
 
+### Phase 27 — The wow factor (v1.14)
+
+The release-dogfood review showed the ceiling: every gate green, and the output still reads competent instead of beautiful. Phases 12–26 are subtractive (they find defects); this phase makes the *starting points and generators* encode the ceiling — a design language with personality, an archetype library at reference quality, a usability layer beyond contrast, and the vision critique as the standard final polish. Deterministic, keyless, reproducible by any agent — not a hand-polished demo.
+
+- [ ] Slice A — `generate_design_system`: seed + personality (technical / editorial / soft / data-dense) → color system + curated font pairing + tracking/leading discipline + radius & density stance + `$elevation.*` shadow tokens (with dark override) + motion defaults
+- [ ] Slice B — archetype raise: shell with grouped nav/account row/topbar; stat-card with eyebrow + tabular value + delta chip (+ optional sparkline); data-table with avatar/status-dot cells; charts with labeled axes; settings with sections + footer save bar; `skeleton-stat-card` + un-skeletoned-region coverage warning
+- [ ] Slice C — usability: hit-target floor (WCAG 2.5.8), label association, vague action copy; `:focus-visible` rings on controls (viewer-only, screenshots stay deterministic)
+- [ ] Slice D — operating contract + proof: personality/final-polish workflow on the agent surfaces; the same demo pipeline re-run as the before/after release story
+
+_Full spec-driven breakdown in [`docs/specs/PHASE-27-SPEC.md`](docs/specs/PHASE-27-SPEC.md)._
+
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
