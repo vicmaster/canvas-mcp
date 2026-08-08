@@ -550,7 +550,7 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
   // Layout
   if (node.layout === 'grid') {
     s.push('display: grid', `grid-template-columns: ${gridTemplateValue(node.gridColumns, node.children?.length ?? 1)}`);
-    if (node.rowGap !== undefined) s.push(`row-gap: ${node.rowGap}px`);
+    if (typeof node.rowGap === 'number') s.push(`row-gap: ${node.rowGap}px`);
   } else if (node.layout === 'horizontal') {
     s.push('display: flex', 'flex-direction: row');
   } else if (node.layout === 'vertical') {
@@ -564,7 +564,7 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
     }
   }
 
-  if (node.gap !== undefined) s.push(`gap: ${node.gap}px`);
+  if (typeof node.gap === 'number') s.push(`gap: ${node.gap}px`);  // unresolved $refs degrade to no gap
   if (node.wrap || node.responsive === 'wrap') s.push('flex-wrap: wrap');
   if (node.alignItems) s.push(`align-items: ${cssFlexAlign(node.alignItems)}`);
   if (node.justifyContent) s.push(`justify-content: ${cssFlexJustify(node.justifyContent)}`);
@@ -577,11 +577,11 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
   if (node.padding !== undefined) {
     if (typeof node.padding === 'number') {
       s.push(`padding: ${responsivePadding(node.padding)}`);
-    } else if (Array.isArray(node.padding)) {
+    } else if (Array.isArray(node.padding) && node.padding.every((p) => typeof p === 'number')) {
       if (node.padding.length === 2) {
-        s.push(`padding: ${responsivePadding(node.padding[0])} ${responsivePadding(node.padding[1])}`);
+        s.push(`padding: ${responsivePadding(node.padding[0] as number)} ${responsivePadding(node.padding[1] as number)}`);
       } else {
-        s.push(`padding: ${node.padding.map(responsivePadding).join(' ')}`);
+        s.push(`padding: ${(node.padding as number[]).map(responsivePadding).join(' ')}`);
       }
     }
   }
@@ -615,9 +615,10 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
   if (node.cornerRadius !== undefined) {
     if (typeof node.cornerRadius === 'number') {
       s.push(`border-radius: ${node.cornerRadius}px`);
-    } else {
-      s.push(`border-radius: ${node.cornerRadius.map((r) => `${r}px`).join(' ')}`);
+    } else if (Array.isArray(node.cornerRadius) && node.cornerRadius.every((v) => typeof v === 'number')) {
+      s.push(`border-radius: ${(node.cornerRadius as number[]).map((r) => `${r}px`).join(' ')}`);
     }
+    // a bare string here is an unresolved $ref — skip rather than emit junk
   }
   if (node.opacity !== undefined) s.push(`opacity: ${node.opacity}`);
   if (node.overflow) s.push(`overflow: ${node.overflow}`);

@@ -56,16 +56,17 @@ for (const personality of PERSONALITY_NAMES) {
   const canvas = createCanvas(`gate-${personality}`);
   applyStructure(canvas, 'dashboard', { replace: true, existingColors: new Set() });
   setVariables(canvas, vars);
-  const result = await evaluateCanvas(canvas, { mode: 'fast', genre: 'dashboard' });
+  // Coverage is excluded like test-patterns does: a freshly stamped canvas
+  // has no state variants yet, and this gate measures craft, not workflow.
+  const result = await evaluateCanvas(canvas, { mode: 'fast', genre: 'dashboard', categories: ['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche'] });
   const errors = result.issues.filter((i) => i.severity === 'error');
   const cliche = result.issues.filter((i) => i.category === 'cliche');
   check('stamped dashboard: zero errors both themes', errors.length === 0, errors.slice(0, 2).map((i) => `[${i.category}] ${i.message.slice(0, 80)}`).join('; '));
   check('stamped dashboard: cliché-clean', cliche.length === 0, cliche.slice(0, 2).map((i) => i.message.slice(0, 80)).join('; '));
-  // Slice A gate: no errors, no tells. The >95 presentation score returns as
-  // the SLICE B gate, when the archetypes read their spacing from the
-  // personality's tokens instead of literals (today's literal 8/24/32 sits
-  // off e.g. editorial's 20-based ladder — that mismatch is slice B's job).
-  check('score floor pending slice B token adoption', result.overallScore >= 85, String(result.overallScore));
+  // Slice B tightened this back to the presentation bar: archetypes read
+  // their density from the personality's tokens, so every personality's
+  // stamp clears the same gate the pattern library holds.
+  check('score above the presentation bar', result.overallScore > 95, String(result.overallScore));
 }
 
 // ── personalities are visibly distinct ────────────────────────────────────

@@ -51,6 +51,19 @@ function deepResolve(node: SceneNode, variables: DesignVariables): SceneNode {
     }
   }
 
+  // Phase 27 slice B — padding / cornerRadius arrays can mix numbers with
+  // "$space-*" / "$radius-*" refs; resolve each entry.
+  for (const key of ['padding', 'cornerRadius'] as const) {
+    const arr = node[key];
+    if (Array.isArray(arr)) {
+      (node as unknown as Record<string, unknown>)[key] = arr.map((entry) => {
+        if (typeof entry !== 'string' || !entry.startsWith('$')) return entry;
+        const resolved = lookupToken(entry.slice(1), variables);
+        return resolved !== undefined ? resolved : entry;
+      });
+    }
+  }
+
   // Phase 22 slice A — object-valued props hold colors the top-level walk
   // above can't see. Resolve $refs one level in (extend this list when a new
   // structured prop carries tokens).

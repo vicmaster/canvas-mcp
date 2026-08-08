@@ -53,10 +53,10 @@ export interface SceneNode {
   minWidth?: number | string;
   maxWidth?: number | string;
   layout?: 'horizontal' | 'vertical' | 'grid' | 'none';
-  gap?: number;
+  gap?: number | string;              // number, or a "$space-*" token ref
   /** grid only (Phase 26 slice A) — row-axis gap override; `gap` covers both
    * axes otherwise. */
-  rowGap?: number;
+  rowGap?: number | string;
   /** grid container — the column template: a count (3 → three equal columns),
    * an array of fr weights and/or CSS lengths ([2, 1, "240px"]), or a raw
    * template string (sanitized; unsafe values fall back to equal columns). */
@@ -65,7 +65,7 @@ export interface SceneNode {
    * "span N" or "a / b" line syntax. */
   gridColumn?: number | string;
   gridRow?: number | string;
-  padding?: number | [number, number] | [number, number, number, number];
+  padding?: number | string | Array<number | string>;  // values or "$space-*" refs (2 or 4 entries)
   alignItems?: 'start' | 'center' | 'end' | 'stretch';
   justifyContent?: 'start' | 'center' | 'end' | 'space-between' | 'space-around';
   wrap?: boolean;
@@ -100,7 +100,7 @@ export interface SceneNode {
   strokeWidth?: number;
   /** Line style for the all-sides `stroke` border (frames). Default "solid". */
   strokeStyle?: 'solid' | 'dashed' | 'dotted';
-  cornerRadius?: number | [number, number, number, number];
+  cornerRadius?: number | string | Array<number | string>;  // values or "$radius-*" refs
   opacity?: number;
   overflow?: 'visible' | 'hidden' | 'auto';
   /** Designed single-line truncation (text nodes): nowrap + hidden +

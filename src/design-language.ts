@@ -204,6 +204,10 @@ export function generateDesignSystem(
     ...display, fontFamily: p.fonts.display, fontWeight: p.roles.displayWeight, letterSpacing: p.roles.displayTracking,
   };
   typography['heading'] = { ...heading, fontFamily: p.fonts.display, fontWeight: p.roles.headingWeight };
+  // Page-title role: the display face at a step below display — the size app
+  // shells actually use for screen titles (scaffolds reference $title).
+  const title = stepOr('text-2xl', 'text-xl');
+  typography['title'] = { ...title, fontFamily: p.fonts.display, fontWeight: p.roles.displayWeight, letterSpacing: p.roles.displayTracking / 2 };
   typography['body'] = { ...body, fontFamily: p.fonts.body };
   // Reading roles hold a 12px floor even on tight ladders (the 11px floor is
   // for captions/annotations; body and labels are read continuously).
