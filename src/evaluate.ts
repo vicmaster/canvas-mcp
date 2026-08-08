@@ -1333,8 +1333,10 @@ function tellRadiusConsistency(ctx: ClicheCtx): EvaluationIssue[] {
   const radii = new Set<number>();
   for (const { node } of ctx.entries) {
     const r = node.cornerRadius;
-    if (typeof r === 'number') { if (r > 0) radii.add(r); }
-    else if (Array.isArray(r)) for (const v of r) if (typeof v === 'number' && v > 0) radii.add(v);
+    // A full pill (≥999) is a SHAPE choice (badge, avatar, pill button), not a
+    // member of the radius scale — exclude it from the census.
+    if (typeof r === 'number') { if (r > 0 && r < 999) radii.add(r); }
+    else if (Array.isArray(r)) for (const v of r) if (typeof v === 'number' && v > 0 && v < 999) radii.add(v);
   }
   if (radii.size < 4) return [];                         // a 1–3 step scale is fine
 
@@ -1572,7 +1574,56 @@ const COVERAGE_HINTS: Record<string, string> = {
 
 function checkCoverage(canvas: Canvas, designedStates: string[]): { result: CheckResult; report?: EvaluationResult['coverage'] } {
   // A variant IS a designed state — demanding states of it would recurse.
-  if (canvas.metadata?.variant) return { result: { score: 100, issues: [] } };
+  // But a LOADING variant that skeletons one data surface while sibling data
+  // surfaces still show live values is half-designed (Phase 27 FR-B4): the
+  // shipped loading screen flashes real-looking data next to placeholders.
+  if (canvas.metadata?.variant) {
+    if (canvas.metadata.variant.state === 'loading') {
+      const root = expandInstances(canvas.root, canvas);
+      const hasSkeleton = (n: SceneNode): boolean =>
+        n.type === 'skeleton' || (n.children ?? []).some(hasSkeleton);
+      if (hasSkeleton(root)) {
+        // A "data surface" shows live values: a detected table, or a frame
+        // holding ≥2 large (≥20px) numeric-capable texts (tabularNums or
+        // digits) — the stat-row shape. Chrome (nav, titles) never matches.
+        const issues: EvaluationIssue[] = [];
+        const inv = extractInventory(root);
+        const tableIds = new Set(inv.tables.map((t) => t.nodeId));
+        const visit = (n: SceneNode): void => {
+          if (hasSkeletonDescendant(n)) { (n.children ?? []).forEach(visit); return; }
+          const isTable = tableIds.has(n.id);
+          const metricTexts = countMetricTexts(n);
+          if (isTable || metricTexts >= 2) {
+            issues.push({
+              category: 'coverage',
+              severity: 'warning',
+              nodeId: n.id,
+              nodeName: n.name,
+              message: `Loading state is half-designed: "${n.name ?? n.id}" still shows live ${isTable ? 'table rows' : 'metric values'} while sibling regions are skeletoned.`,
+              suggestion: 'Skeleton every data surface — stamp skeleton-stat-card / skeleton-table / skeleton-card over the remaining live regions.',
+            });
+            return; // one finding per region, don't descend further
+          }
+          (n.children ?? []).forEach(visit);
+        };
+        const hasSkeletonDescendant = (n: SceneNode): boolean =>
+          n.type === 'skeleton' || (n.children ?? []).some(hasSkeletonDescendant);
+        const countMetricTexts = (n: SceneNode): number => {
+          let count = 0;
+          const walk = (x: SceneNode): void => {
+            if (x.type === 'text' && typeof x.fontSize === 'number' && x.fontSize >= 20
+              && (x.tabularNums === true || /\d/.test(String(x.content ?? '')))) count++;
+            (x.children ?? []).forEach(walk);
+          };
+          walk(n);
+          return count;
+        };
+        visit(root);
+        return { result: { score: Math.max(0, 100 - issues.length * 35), issues } };
+      }
+    }
+    return { result: { score: 100, issues: [] } };
+  }
 
   const inv = extractInventory(expandInstances(canvas.root, canvas));
   const demanded = new Map<string, string>(); // state → noun that demanded it

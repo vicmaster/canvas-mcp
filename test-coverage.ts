@@ -131,5 +131,43 @@ I(f, { type: "checkbox" })
   check('table inside an instance → still demands states', (r.coverage?.missing ?? []).length === 2, JSON.stringify(r.coverage));
 }
 
+// ── Phase 27 FR-B4: half-skeletoned loading variants ────────────────────────
+{
+  const { addVariant } = await import('./src/scene-graph.js');
+  const base = createCanvas('Dash');
+  parseAndExecute(base.root, `
+main=I("document", { type: "frame", name: "Main", layout: "vertical", gap: 16 })
+stats=I(main, { type: "frame", name: "Stat row", layout: "horizontal", gap: 16 })
+s1=I(stats, { type: "frame", name: "Stat A", layout: "vertical" })
+I(s1, { type: "text", content: "Metric — TBD", fontSize: 28, tabularNums: true })
+s2=I(stats, { type: "frame", name: "Stat B", layout: "vertical" })
+I(s2, { type: "text", content: "Metric — TBD", fontSize: 28, tabularNums: true })
+tbl=I(main, { type: "frame", name: "Table area", layout: "vertical" })
+I(tbl, { type: "skeleton", width: 400, height: 12 })
+I(tbl, { type: "skeleton", width: 400, height: 12 })
+`, base);
+  const { canvas: loading } = addVariant(base.id, 'loading');
+  const r = await evaluateCanvas(loading, { mode: 'fast', categories: ['coverage'] });
+  const half = r.issues.filter((i) => i.message.includes('half-designed'));
+  check('half-skeletoned loading variant flags the live region', half.length === 1 && (half[0].nodeName ?? '').includes('Stat'), JSON.stringify(half.map((i) => i.nodeName)));
+
+  // fully skeletoned → clean
+  const base2 = createCanvas('Dash2');
+  parseAndExecute(base2.root, `
+main=I("document", { type: "frame", name: "Main", layout: "vertical", gap: 16 })
+I(main, { type: "skeleton", width: 200, height: 24 })
+tbl=I(main, { type: "frame", name: "Table area", layout: "vertical" })
+I(tbl, { type: "skeleton", width: 400, height: 12 })
+`, base2);
+  const { canvas: loading2 } = addVariant(base2.id, 'loading');
+  const r2 = await evaluateCanvas(loading2, { mode: 'fast', categories: ['coverage'] });
+  check('fully skeletoned loading variant stays clean', r2.issues.length === 0, JSON.stringify(r2.issues.map((i) => i.message)));
+
+  // an empty variant never runs the check
+  const { canvas: emptyVar } = addVariant(base.id, 'empty');
+  const r3 = await evaluateCanvas(emptyVar, { mode: 'fast', categories: ['coverage'] });
+  check('non-loading variants exempt', r3.issues.length === 0);
+}
+
 console.log(allPass ? '\nAll coverage tests passed.' : '\nSOME TESTS FAILED');
 process.exit(allPass ? 0 : 1);

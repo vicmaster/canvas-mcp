@@ -258,7 +258,7 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
     const missing = ELEVATION_NAMES.filter((e) => !surface[1].includes(`$elevation`) || !surface[1].includes(e));
     expect(`elevation vocabulary in ${surface[0]}`, missing.length === 0, missing.join(', '));
   }
-  const ROLES = ['$display', '$heading', '$body', '$label'];
+  const ROLES = ['$display', '$heading', '$title', '$body', '$label'];
   for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines]] as const) {
     const missing = ROLES.filter((r) => !surface[1].includes(r));
     expect(`typography roles in ${surface[0]}`, missing.length === 0, missing.join(', '));

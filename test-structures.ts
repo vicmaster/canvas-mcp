@@ -18,18 +18,26 @@ const AXES = {
 // Only these fields may carry a `$token` ref; everything else must be literal
 // (the A-P4 theming split — geometry stays crash-safe on unthemed canvases).
 const COLOR_FIELDS = new Set(['fill', 'color', 'stroke', 'iconColor']);
+// Phase 27 slice B — density/depth/type live on tokens too. These fields may
+// carry $refs ('$space-*', '$radius-*', '$elevation.*', '$title'); anything
+// else stringly-$ is still a violation.
+const TOKEN_FIELDS = new Set(['gap', 'rowGap', 'padding', 'cornerRadius', 'shadow', 'fontSize']);
 
 function walk(node: SceneNode, visit: (n: SceneNode) => void): void {
   visit(node);
   node.children?.forEach((c) => walk(c, visit));
 }
 
-const NAMES = ['marquee-hero', 'bento-grid', 'stat-led', 'editorial-longform', 'split-workbench', 'catalogue'];
+// Count-independent: the live catalogue is the source of truth (the roster
+// grew far past the Phase 11 six this file used to hard-code).
+const PAGES = listStructures().filter((s) => s.kind === 'page').map((s) => s.name);
+const NAMES = PAGES;
 
 console.log('listStructures()');
 const list = listStructures();
-check(list.length === NAMES.length, `returns ${NAMES.length} structures (got ${list.length})`);
-check(list.every((s) => !!s.name && !!s.description && !!s.axes), 'each entry has name + description + axes');
+check(list.length >= 12, `catalogue holds pages + components (got ${list.length})`);
+check(PAGES.length >= 6, `at least the original six page structures (got ${PAGES.length})`);
+check(list.filter((s) => s.kind === 'page').every((s) => !!s.name && !!s.description && !!s.axes), 'each page entry has name + description + axes');
 
 console.log('getStructure()');
 for (const name of NAMES) check(!!getStructure(name), `resolves '${name}'`);
@@ -50,18 +58,19 @@ for (const name of NAMES) {
   check(Array.isArray(s.nodes) && s.nodes.length > 0, `${name} has nodes`);
 }
 
-console.log('theming split — only color fields hold $tokens; geometry is literal (A-P4)');
+console.log('theming split — $tokens only in color or token-bearing fields (A-P4 + Phase 27B)');
 for (const name of NAMES) {
   const s = getStructure(name)!;
-  let violations: string[] = [];
+  const violations: string[] = [];
   s.nodes.forEach((root) => walk(root, (n) => {
     for (const [k, val] of Object.entries(n)) {
-      if (typeof val === 'string' && val.startsWith('$') && !COLOR_FIELDS.has(k)) {
-        violations.push(`${n.id}.${k}=${val}`);
+      const holds = (v: unknown): boolean => typeof v === 'string' && v.startsWith('$');
+      if ((holds(val) || (Array.isArray(val) && val.some(holds))) && !COLOR_FIELDS.has(k) && !TOKEN_FIELDS.has(k)) {
+        violations.push(`${n.id}.${k}=${JSON.stringify(val)}`);
       }
     }
   }));
-  check(violations.length === 0, `${name} keeps $tokens in color fields only${violations.length ? ` (offenders: ${violations.join(', ')})` : ''}`);
+  check(violations.length === 0, `${name} keeps $tokens in sanctioned fields${violations.length ? ` (offenders: ${violations.join(', ')})` : ''}`);
 }
 
 console.log('all node ids are unique within a structure');
@@ -78,7 +87,7 @@ const stub: Structure = {
 };
 registerStructure(stub);
 check(getStructure('test-stub')?.description === 'temp', 'registered stub is retrievable');
-check(listStructures().length === NAMES.length + 1, `list now reports ${NAMES.length + 1}`);
+check(listStructures().length === list.length + 1, `list grows by one after registration`);
 
 console.log(failures === 0 ? '\nT2a SMOKE TEST PASSED ✅' : `\nT2a SMOKE TEST FAILED ✗ (${failures})`);
 process.exit(failures === 0 ? 0 : 1);

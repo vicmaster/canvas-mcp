@@ -25,6 +25,34 @@ const COLOR = {
   border: '$border',
 } as const;
 
+/** Phase 27 slice B — density comes from tokens, not literals. Scaffolds
+ * reference the space/radius/elevation vocabulary generate_design_system
+ * writes; applyStructure seeds neutral defaults (the pre-27 literal values)
+ * for anything not already resolvable, so unthemed canvases render exactly
+ * as before and a personality re-densifies every stamp. */
+const SPACE = {
+  xxs: '$space-3xs',   // 2
+  xs2: '$space-2xs',   // 4
+  xs: '$space-xs',     // 8
+  sm: '$space-sm',     // 12
+  md: '$space-md',     // 16
+  lg: '$space-lg',     // 24
+  xl: '$space-xl',     // 32
+  xl2: '$space-2xl',   // 48
+} as const;
+const RADIUS = {
+  sm: '$radius-sm',    // 8
+  md: '$radius-md',    // 12
+  lg: '$radius-lg',    // 16
+} as const;
+const ELEV = {
+  flat: '$elevation.flat',
+  raised: '$elevation.raised',
+} as const;
+const TYPE = {
+  title: '$title',     // page titles — the display face when a personality is set
+} as const;
+
 /** A labeled placeholder card — a surface with a role label + neutral body. */
 function card(
   id: string,
@@ -42,9 +70,9 @@ function card(
     height,
     layout: 'vertical',
     justifyContent: 'space-between',
-    gap: 16,
-    padding: 24,
-    cornerRadius: 16,
+    gap: SPACE.md,
+    padding: SPACE.lg,
+    cornerRadius: RADIUS.lg,
     fill,
     stroke: COLOR.border,
     strokeWidth: 1,
@@ -64,8 +92,8 @@ function button(id: string, label: string, fill: string, color: string, stroke?:
     layout: 'horizontal',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: [8, 24],
-    cornerRadius: 8,
+    padding: [SPACE.xs, SPACE.lg],
+    cornerRadius: RADIUS.sm,
     fill,
     ...(stroke ? { stroke, strokeWidth: 1 } : {}),
     children: [{ id: `${id}-label`, type: 'text', content: label, fontSize: 16, fontWeight: 600, color }],
@@ -81,23 +109,41 @@ function stat(id: string, icon = 'activity'): SceneNode {
     name: 'Stat',
     width: 300,
     layout: 'vertical',
-    gap: 8,
-    alignItems: 'center',
-    padding: 32,
-    cornerRadius: 16,
+    gap: SPACE.xs,
+    padding: SPACE.lg,
+    cornerRadius: RADIUS.md,
     fill: COLOR.bgSurface,
     stroke: COLOR.border,
     strokeWidth: 1,
+    shadow: ELEV.flat,
     children: [
-      { id: `${id}-icon`, type: 'icon', icon, iconSize: 24, iconColor: COLOR.accent },
-      { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', textOverflow: 'ellipsis' },
-      { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 14, color: COLOR.textSecondary, textAlign: 'center' },
+      {
+        id: `${id}-head`, type: 'frame', name: 'Label row', width: '100%', layout: 'horizontal',
+        alignItems: 'center', justifyContent: 'space-between',
+        children: [
+          // Sentence case, no tracking — a stat label is a label, not an eyebrow.
+          { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 12, fontWeight: 500, color: COLOR.textSecondary },
+          { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: COLOR.textSecondary },
+        ],
+      },
+      { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, letterSpacing: -0.5, tabularNums: true, textOverflow: 'ellipsis' },
+      {
+        id: `${id}-delta`, type: 'frame', name: 'Delta', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+        children: [
+          { id: `${id}-delta-icon`, type: 'icon', icon: 'trending-up', iconSize: 14, iconColor: '$success' },
+          { id: `${id}-delta-text`, type: 'text', content: 'Change — TBD', fontSize: 12, fontWeight: 600, color: '$success' },
+          { id: `${id}-delta-period`, type: 'text', content: 'vs last period', fontSize: 12, color: COLOR.textSecondary },
+        ],
+      },
     ],
   };
 }
 
-/** A sidebar nav row: a leading icon + label. */
-function navItem(id: string, label: string, icon = 'circle'): SceneNode {
+/** A sidebar nav row: leading icon + label; the active row reads as selected
+ * (elevated fill, accent icon, primary text), rest are quiet; an optional
+ * count badge sits trailing. */
+function navItem(id: string, label: string, icon = 'circle', opts: { active?: boolean; badge?: string } = {}): SceneNode {
+  const active = opts.active === true;
   return {
     id,
     type: 'frame',
@@ -105,13 +151,52 @@ function navItem(id: string, label: string, icon = 'circle'): SceneNode {
     width: '100%',
     layout: 'horizontal',
     alignItems: 'center',
-    gap: 8,
-    padding: [8, 16],
-    cornerRadius: 8,
-    fill: COLOR.bgElevated,
+    gap: SPACE.xs,
+    padding: [SPACE.xs, SPACE.sm],
+    cornerRadius: RADIUS.sm,
+    fill: active ? COLOR.bgElevated : 'transparent',
     children: [
-      { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: COLOR.textSecondary },
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+      { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: active ? COLOR.accent : COLOR.textSecondary },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, fontWeight: active ? 600 : 400, color: active ? COLOR.textPrimary : COLOR.textSecondary, textOverflow: 'ellipsis' },
+      ...(opts.badge ? [{
+        id: `${id}-badge`, type: 'frame' as const, name: 'Badge', layout: 'horizontal' as const, alignItems: 'center' as const,
+        justifyContent: 'center' as const, minWidth: 20, padding: [2, SPACE.xs2], cornerRadius: 999, fill: COLOR.bgElevated,
+        children: [{ id: `${id}-badge-text`, type: 'text' as const, content: opts.badge, fontSize: 12, fontWeight: 600, color: COLOR.textSecondary, tabularNums: true }],
+      }] : []),
+    ],
+  };
+}
+
+/** A sidebar nav group: a quiet sentence-case group label (NOT an eyebrow —
+ * no uppercase, no tracking) over its items. */
+function navGroup(id: string, label: string, items: SceneNode[]): SceneNode {
+  return {
+    id, type: 'frame', name: label, width: '100%', layout: 'vertical', gap: SPACE.xxs,
+    children: [
+      { id: `${id}-label`, type: 'text', content: label, fontSize: 12, fontWeight: 600, color: COLOR.textSecondary },
+      ...items,
+    ],
+  };
+}
+
+/** An activity-feed row: an icon tile beside the event line + timestamp. */
+function activityRow(id: string, icon: string): SceneNode {
+  return {
+    id, type: 'frame', name: 'Activity item', width: '100%', layout: 'horizontal',
+    alignItems: 'center', gap: SPACE.sm,
+    children: [
+      {
+        id: `${id}-tile`, type: 'frame', name: 'Icon tile', width: 28, height: 28, cornerRadius: RADIUS.sm,
+        fill: COLOR.bgElevated, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+        children: [{ id: `${id}-icon`, type: 'icon', icon, iconSize: 14, iconColor: COLOR.textSecondary }],
+      },
+      {
+        id: `${id}-copy`, type: 'frame', name: 'Copy', layout: 'vertical',
+        children: [
+          { id: `${id}-text`, type: 'text', content: 'Activity item — to confirm', fontSize: 14, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+          { id: `${id}-time`, type: 'text', content: 'Timestamp — TBD', fontSize: 12, color: COLOR.textSecondary },
+        ],
+      },
     ],
   };
 }
@@ -124,7 +209,7 @@ function catItem(id: string): SceneNode {
     name: 'Catalogue item',
     width: 368,
     layout: 'vertical',
-    cornerRadius: 16,
+    cornerRadius: RADIUS.lg,
     overflow: 'hidden',
     fill: COLOR.bgSurface,
     stroke: COLOR.border,
@@ -136,8 +221,8 @@ function catItem(id: string): SceneNode {
         type: 'frame',
         width: '100%',
         layout: 'vertical',
-        gap: 8,
-        padding: 16,
+        gap: SPACE.xs,
+        padding: SPACE.md,
         children: [
           { id: `${id}-title`, type: 'text', content: 'Item title', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
           { id: `${id}-meta`, type: 'text', content: 'Meta — to confirm', fontSize: 13, color: COLOR.textSecondary },
@@ -150,10 +235,10 @@ function catItem(id: string): SceneNode {
 /** A labeled form field for page scaffolds: label over an input box. */
 function field(id: string, label: string): SceneNode {
   return {
-    id, type: 'frame', name: label, width: '100%', layout: 'vertical', gap: 8,
+    id, type: 'frame', name: label, width: '100%', layout: 'vertical', gap: SPACE.xs,
     children: [
       { id: `${id}-label`, type: 'text', content: label, fontSize: 14, fontWeight: 600, color: COLOR.textSecondary },
-      { id: `${id}-input`, type: 'frame', name: 'Input', width: '100%', height: 44, cornerRadius: 8, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1 },
+      { id: `${id}-input`, type: 'frame', name: 'Input', width: '100%', height: 44, cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1 },
     ],
   };
 }
@@ -161,7 +246,7 @@ function field(id: string, label: string): SceneNode {
 /** A feature row: a check icon + a placeholder feature label. */
 function featureRow(id: string): SceneNode {
   return {
-    id, type: 'frame', name: 'Feature', width: '100%', layout: 'horizontal', gap: 8, alignItems: 'center',
+    id, type: 'frame', name: 'Feature', width: '100%', layout: 'horizontal', gap: SPACE.xs, alignItems: 'center',
     children: [
       { id: `${id}-icon`, type: 'icon', icon: 'check', iconSize: 16, iconColor: COLOR.accent },
       { id: `${id}-text`, type: 'text', content: 'Feature — to confirm', fontSize: 14, color: COLOR.textSecondary },
@@ -172,23 +257,23 @@ function featureRow(id: string): SceneNode {
 /** A pricing tier card: name, price slot, feature list, CTA. No fake prices. */
 function tier(id: string, name: string): SceneNode {
   return {
-    id, type: 'frame', name, width: 320, layout: 'vertical', gap: 24, padding: 32,
-    cornerRadius: 16, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+    id, type: 'frame', name, width: 320, layout: 'vertical', gap: SPACE.lg, padding: SPACE.xl,
+    cornerRadius: RADIUS.lg, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
     children: [
       {
-        id: `${id}-head`, type: 'frame', name: 'Tier head', width: '100%', layout: 'vertical', gap: 8,
+        id: `${id}-head`, type: 'frame', name: 'Tier head', width: '100%', layout: 'vertical', gap: SPACE.xs,
         children: [
           { id: `${id}-name`, type: 'text', content: name, fontSize: 16, fontWeight: 600, color: COLOR.textSecondary },
           { id: `${id}-price`, type: 'text', content: 'Price — to confirm', fontSize: 32, fontWeight: 700, color: COLOR.textPrimary },
         ],
       },
       {
-        id: `${id}-features`, type: 'frame', name: 'Features', width: '100%', layout: 'vertical', gap: 8,
+        id: `${id}-features`, type: 'frame', name: 'Features', width: '100%', layout: 'vertical', gap: SPACE.xs,
         children: [featureRow(`${id}-f1`), featureRow(`${id}-f2`), featureRow(`${id}-f3`)],
       },
       {
         id: `${id}-cta`, type: 'frame', name: 'Choose plan', width: '100%', layout: 'horizontal',
-        alignItems: 'center', justifyContent: 'center', padding: [8, 24], cornerRadius: 8, fill: COLOR.accent,
+        alignItems: 'center', justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
         children: [{ id: `${id}-cta-label`, type: 'text', content: 'Choose plan', fontSize: 14, fontWeight: 600, color: COLOR.bgPrimary }],
       },
     ],
@@ -199,13 +284,13 @@ function tier(id: string, name: string): SceneNode {
 function settingsRow(id: string, on: boolean): SceneNode {
   return {
     id, type: 'frame', name: 'Setting', width: '100%', layout: 'horizontal',
-    justifyContent: 'space-between', alignItems: 'center', gap: 24, padding: 24,
+    justifyContent: 'space-between', alignItems: 'center', gap: SPACE.lg, padding: SPACE.lg,
     children: [
       {
-        id: `${id}-text`, type: 'frame', layout: 'vertical', gap: 8,
+        id: `${id}-text`, type: 'frame', layout: 'vertical', gap: SPACE.xs,
         children: [
-          { id: `${id}-label`, type: 'text', content: 'Setting label', fontSize: 15, fontWeight: 600, color: COLOR.textPrimary },
-          { id: `${id}-desc`, type: 'text', content: 'Description — to confirm', fontSize: 13, color: COLOR.textSecondary },
+          { id: `${id}-label`, type: 'text', content: 'Setting label', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
+          { id: `${id}-desc`, type: 'text', content: 'Description — to confirm', fontSize: 12, color: COLOR.textSecondary },
         ],
       },
       { id: `${id}-toggle`, type: 'toggle', checked: on },
@@ -230,8 +315,8 @@ const marqueeHero: Structure = {
       layout: 'vertical',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 24,
-      padding: [64, 48],
+      gap: SPACE.lg,
+      padding: ['$space-3xl', SPACE.xl2],
       fill: COLOR.bgPrimary,
       children: [
         { id: 'mh-eyebrow', type: 'text', name: 'Eyebrow', content: 'Eyebrow — short label', fontSize: 14, fontWeight: 600, color: COLOR.accent, textAlign: 'center', letterSpacing: 1 },
@@ -242,11 +327,11 @@ const marqueeHero: Structure = {
           type: 'frame',
           name: 'CTA row',
           layout: 'horizontal',
-          gap: 16,
+          gap: SPACE.md,
           responsive: 'stack',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: [16, 0, 0, 0],
+          padding: [SPACE.md, 0, 0, 0],
           children: [
             button('mh-cta-primary', 'Primary action', COLOR.accent, COLOR.bgPrimary),
             button('mh-cta-secondary', 'Secondary action', COLOR.bgSurface, COLOR.textPrimary, COLOR.border),
@@ -261,8 +346,8 @@ const marqueeHero: Structure = {
       width: '100%',
       layout: 'vertical',
       alignItems: 'center',
-      gap: 8,
-      padding: [64, 48],
+      gap: SPACE.xs,
+      padding: ['$space-3xl', SPACE.xl2],
       fill: COLOR.bgSurface,
       children: [
         { id: 'mh-support-title', type: 'text', content: 'Supporting section', fontSize: 28, fontWeight: 600, color: COLOR.textPrimary, textAlign: 'center' },
@@ -287,8 +372,8 @@ const bentoGrid: Structure = {
       name: 'Page',
       width: '100%',
       layout: 'vertical',
-      gap: 32,
-      padding: [48, 48],
+      gap: SPACE.xl,
+      padding: [SPACE.xl2, SPACE.xl2],
       fill: COLOR.bgPrimary,
       children: [
         {
@@ -296,7 +381,7 @@ const bentoGrid: Structure = {
           type: 'frame',
           name: 'Header',
           layout: 'vertical',
-          gap: 8,
+          gap: SPACE.xs,
           children: [
             { id: 'bn-eyebrow', type: 'text', content: 'Eyebrow — section label', fontSize: 14, fontWeight: 600, color: COLOR.accent, letterSpacing: 1 },
             { id: 'bn-title', type: 'text', content: 'Headline', fontSize: 40, fontWeight: 700, color: COLOR.textPrimary, lineHeight: 1.2 },
@@ -311,7 +396,7 @@ const bentoGrid: Structure = {
           name: 'Bento grid',
           layout: 'grid',
           gridColumns: 4,
-          gap: 24,
+          gap: SPACE.lg,
           responsive: 'stack',
           children: [
             { ...card('bn-card-1', 'Feature card — primary', 560, 280, COLOR.bgSurface), width: '100%', gridColumn: 3 },
@@ -341,8 +426,8 @@ const statLed: Structure = {
       width: '100%',
       layout: 'vertical',
       alignItems: 'center',
-      gap: 32,
-      padding: [64, 48],
+      gap: SPACE.xl,
+      padding: ['$space-3xl', SPACE.xl2],
       fill: COLOR.bgPrimary,
       children: [
         {
@@ -352,7 +437,7 @@ const statLed: Structure = {
           width: '100%',
           layout: 'vertical',
           alignItems: 'center',
-          gap: 16,
+          gap: SPACE.md,
           children: [
             { id: 'sl-eyebrow', type: 'text', content: 'Eyebrow — short label', fontSize: 14, fontWeight: 600, color: COLOR.accent, textAlign: 'center', letterSpacing: 1 },
             { id: 'sl-headline', type: 'text', content: 'Headline', fontSize: 48, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.15, maxWidth: 760 },
@@ -364,7 +449,7 @@ const statLed: Structure = {
           type: 'frame',
           name: 'Stat row',
           layout: 'horizontal',
-          gap: 24,
+          gap: SPACE.lg,
           responsive: 'stack',
           justifyContent: 'center',
           children: [stat('sl-stat-1', 'trending-up'), stat('sl-stat-2', 'users'), stat('sl-stat-3', 'activity')],
@@ -389,7 +474,7 @@ const editorialLongform: Structure = {
       width: '100%',
       layout: 'vertical',
       alignItems: 'center',
-      padding: [64, 48],
+      padding: ['$space-3xl', SPACE.xl2],
       fill: COLOR.bgPrimary,
       children: [
         {
@@ -399,7 +484,7 @@ const editorialLongform: Structure = {
           width: '100%',
           maxWidth: 720,
           layout: 'vertical',
-          gap: 24,
+          gap: SPACE.lg,
           children: [
             { id: 'ed-kicker', type: 'text', content: 'Eyebrow — category', fontSize: 14, fontWeight: 600, color: COLOR.accent, letterSpacing: 1 },
             { id: 'ed-title', type: 'text', content: 'Headline', fontSize: 44, fontWeight: 700, color: COLOR.textPrimary, lineHeight: 1.2 },
@@ -439,8 +524,8 @@ const splitWorkbench: Structure = {
           name: 'Sidebar',
           width: 280,
           layout: 'vertical',
-          gap: 8,
-          padding: 24,
+          gap: SPACE.xs,
+          padding: SPACE.lg,
           fill: COLOR.bgSurface,
           stroke: COLOR.border,
           strokeWidth: 1,
@@ -458,8 +543,8 @@ const splitWorkbench: Structure = {
           name: 'Workspace',
           width: 1000,
           layout: 'vertical',
-          gap: 24,
-          padding: 24,
+          gap: SPACE.lg,
+          padding: SPACE.lg,
           fill: COLOR.bgPrimary,
           children: [
             {
@@ -481,7 +566,7 @@ const splitWorkbench: Structure = {
               name: 'Work area',
               width: '100%',
               height: 420,
-              cornerRadius: 16,
+              cornerRadius: RADIUS.lg,
               fill: COLOR.bgSurface,
               stroke: COLOR.border,
               strokeWidth: 1,
@@ -511,8 +596,8 @@ const catalogue: Structure = {
       name: 'Page',
       width: '100%',
       layout: 'vertical',
-      gap: 32,
-      padding: [48, 48],
+      gap: SPACE.xl,
+      padding: [SPACE.xl2, SPACE.xl2],
       fill: COLOR.bgPrimary,
       children: [
         {
@@ -537,7 +622,7 @@ const catalogue: Structure = {
           layout: 'horizontal',
           wrap: true,
           responsive: 'wrap',
-          gap: 24,
+          gap: SPACE.lg,
           children: [catItem('cat-1'), catItem('cat-2'), catItem('cat-3'), catItem('cat-4'), catItem('cat-5'), catItem('cat-6')],
         },
       ],
@@ -552,7 +637,7 @@ const catalogue: Structure = {
 const dashboard: Structure = {
   name: 'dashboard',
   description:
-    'Application dashboard — sidebar nav beside a main column: topbar with primary action, a row of stat blocks, then a chart area next to a recent-activity panel. Dense and split; stacks on mobile. The default first screen for tools and admin apps.',
+    'Application dashboard — a real product shell: sidebar with grouped navigation (active item, badge count, account row) beside a main column with a topbar (title, search, primary action), a stat row with delta chips, then a labeled chart with legend next to an activity feed with icon tiles and timestamps. Dense and split; stacks on mobile. The default first screen for tools and admin apps.',
   axes: { heroTreatment: 'none', density: 'dense', rhythm: 'uniform', alignment: 'split' },
   nodes: [
     {
@@ -560,64 +645,152 @@ const dashboard: Structure = {
       responsive: 'stack', fill: COLOR.bgPrimary,
       children: [
         {
-          id: 'db-sidebar', type: 'frame', name: 'Sidebar', width: 240, layout: 'vertical',
-          gap: 8, padding: 24, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+          id: 'db-sidebar', type: 'frame', name: 'Sidebar', width: 248, layout: 'vertical',
+          justifyContent: 'space-between', gap: SPACE.lg, padding: SPACE.md,
+          fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
           children: [
-            { id: 'db-brand', type: 'text', content: 'Brand', fontSize: 16, fontWeight: 700, color: COLOR.textPrimary },
-            navItem('db-nav-1', 'Overview', 'layout-dashboard'),
-            navItem('db-nav-2', 'Nav item', 'users'),
-            navItem('db-nav-3', 'Nav item', 'folder'),
-            navItem('db-nav-4', 'Nav item', 'settings'),
+            {
+              id: 'db-side-top', type: 'frame', name: 'Nav', width: '100%', layout: 'vertical', gap: SPACE.lg,
+              children: [
+                {
+                  id: 'db-brand', type: 'frame', name: 'Brand', width: '100%', layout: 'horizontal',
+                  alignItems: 'center', gap: SPACE.xs, padding: [SPACE.xs2, SPACE.sm],
+                  children: [
+                    {
+                      id: 'db-brand-mark', type: 'frame', name: 'Mark', width: 28, height: 28, cornerRadius: RADIUS.sm,
+                      fill: COLOR.accent, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+                      children: [{ id: 'db-brand-icon', type: 'icon', icon: 'zap', iconSize: 16, iconColor: COLOR.bgPrimary }],
+                    },
+                    { id: 'db-brand-name', type: 'text', content: 'Brand', fontSize: 16, fontWeight: 700, color: COLOR.textPrimary },
+                  ],
+                },
+                navGroup('db-group-main', 'Workspace', [
+                  navItem('db-nav-1', 'Overview', 'layout-dashboard', { active: true }),
+                  navItem('db-nav-2', 'Reports', 'chart-line'),
+                  navItem('db-nav-3', 'Inbox', 'inbox', { badge: '3' }),
+                ]),
+                navGroup('db-group-org', 'Organization', [
+                  navItem('db-nav-4', 'Members', 'users'),
+                  navItem('db-nav-5', 'Settings', 'settings'),
+                ]),
+              ],
+            },
+            {
+              id: 'db-account', type: 'frame', name: 'Account row', width: '100%', layout: 'horizontal',
+              alignItems: 'center', gap: SPACE.xs, padding: [SPACE.xs, SPACE.sm],
+              cornerRadius: RADIUS.sm, fill: COLOR.bgElevated,
+              children: [
+                {
+                  id: 'db-account-avatar', type: 'frame', name: 'Avatar', width: 28, height: 28, cornerRadius: 999,
+                  fill: COLOR.bgPrimary, stroke: COLOR.border, strokeWidth: 1,
+                  layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+                  children: [{ id: 'db-account-icon', type: 'icon', icon: 'user', iconSize: 14, iconColor: COLOR.textSecondary }],
+                },
+                {
+                  id: 'db-account-copy', type: 'frame', name: 'Identity', layout: 'vertical',
+                  children: [
+                    { id: 'db-account-name', type: 'text', content: 'Account name — TBD', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+                    { id: 'db-account-role', type: 'text', content: 'Workspace — TBD', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+                  ],
+                },
+                { id: 'db-account-menu', type: 'icon', icon: 'chevrons-up-down', iconSize: 14, iconColor: COLOR.textSecondary },
+              ],
+            },
           ],
         },
         {
-          id: 'db-main', type: 'frame', name: 'Main', width: 1160, layout: 'vertical',
-          gap: 24, padding: 24, fill: COLOR.bgPrimary,
+          id: 'db-main', type: 'frame', name: 'Main', width: 1192, layout: 'vertical',
+          gap: SPACE.lg, padding: SPACE.lg, fill: COLOR.bgPrimary,
           children: [
             {
               id: 'db-topbar', type: 'frame', name: 'Topbar', width: '100%', layout: 'horizontal',
-              justifyContent: 'space-between', alignItems: 'center',
+              justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md,
               children: [
-                { id: 'db-title', type: 'text', content: 'Dashboard', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary },
-                button('db-action', 'Primary action', COLOR.accent, COLOR.bgPrimary),
+                { id: 'db-title', type: 'text', content: 'Dashboard', fontSize: TYPE.title, color: COLOR.textPrimary },
+                {
+                  id: 'db-topbar-actions', type: 'frame', name: 'Actions', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
+                  children: [
+                    {
+                      id: 'db-search', type: 'frame', name: 'Search', width: 240, height: 36, layout: 'horizontal',
+                      alignItems: 'center', gap: SPACE.xs, padding: [SPACE.xs, SPACE.sm], cornerRadius: RADIUS.sm,
+                      fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                      children: [
+                        { id: 'db-search-icon', type: 'icon', icon: 'search', iconSize: 15, iconColor: COLOR.textSecondary },
+                        { id: 'db-search-text', type: 'text', content: 'Search', fontSize: 14, color: COLOR.textSecondary },
+                      ],
+                    },
+                    {
+                      id: 'db-bell', type: 'frame', name: 'Notifications', width: 36, height: 36, cornerRadius: RADIUS.sm,
+                      fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                      layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+                      children: [{ id: 'db-bell-icon', type: 'icon', icon: 'bell', iconSize: 16, iconColor: COLOR.textSecondary }],
+                    },
+                    button('db-action', 'Primary action', COLOR.accent, COLOR.bgPrimary),
+                  ],
+                },
               ],
             },
             {
               id: 'db-stats', type: 'frame', name: 'Stat row', width: '100%', layout: 'horizontal',
-              gap: 24, responsive: 'wrap', wrap: true,
+              gap: SPACE.md, responsive: 'wrap', wrap: true,
               children: [stat('db-stat-1', 'trending-up'), stat('db-stat-2', 'users'), stat('db-stat-3', 'activity')],
             },
             {
               id: 'db-content', type: 'frame', name: 'Content', width: '100%', layout: 'horizontal',
-              gap: 24, responsive: 'stack',
+              gap: SPACE.md, responsive: 'stack',
               children: [
                 {
-                  id: 'db-chart', type: 'frame', name: 'Chart panel', width: 720, layout: 'vertical',
-                  gap: 16, padding: 24, cornerRadius: 16, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                  id: 'db-chart', type: 'frame', name: 'Chart panel', width: 760, layout: 'vertical',
+                  gap: SPACE.md, padding: SPACE.lg, cornerRadius: RADIUS.lg,
+                  fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
                   children: [
-                    { id: 'db-chart-title', type: 'text', content: 'Overview', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
                     {
-                      // Phase 22 slice F — a real data-driven chart instead of a
-                      // labeled placeholder box. Neutral placeholder shape (adapt
-                      // the data); accent series + a muted dashed reference line.
-                      id: 'db-chart-area', type: 'chart', name: 'Chart area', width: 672, height: 224,
+                      id: 'db-chart-head', type: 'frame', name: 'Chart header', width: '100%', layout: 'horizontal',
+                      alignItems: 'center', justifyContent: 'space-between',
+                      children: [
+                        { id: 'db-chart-title', type: 'text', content: 'Overview', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
+                        {
+                          id: 'db-legend', type: 'frame', name: 'Legend', layout: 'horizontal', alignItems: 'center', gap: SPACE.sm,
+                          children: [
+                            {
+                              id: 'db-legend-a', type: 'frame', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+                              children: [
+                                { id: 'db-legend-a-dot', type: 'ellipse', width: 8, height: 8, fill: COLOR.accent },
+                                { id: 'db-legend-a-text', type: 'text', content: 'Series A — TBD', fontSize: 12, color: COLOR.textSecondary },
+                              ],
+                            },
+                            {
+                              id: 'db-legend-b', type: 'frame', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+                              children: [
+                                { id: 'db-legend-b-dot', type: 'ellipse', width: 8, height: 8, fill: COLOR.border },
+                                { id: 'db-legend-b-text', type: 'text', content: 'Baseline — TBD', fontSize: 12, color: COLOR.textSecondary },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    {
+                      id: 'db-chart-area', type: 'chart', name: 'Chart area', width: 712, height: 224,
                       kind: 'line', curve: 'smooth', gridlines: 4,
                       series: [
                         { data: [12, 18, 15, 24, 22, 30, 34], stroke: COLOR.accent, strokeWidth: 2.5, area: true },
                         { data: [10, 12, 14, 16, 18, 20, 22], stroke: COLOR.border, strokeDasharray: '6 4' },
                       ],
                       xLabels: ['Label', '', '', '', '', '', 'Label'],
+                      yLabels: ['Label', '', '', '', 'Label'],
                     },
                   ],
                 },
                 {
-                  id: 'db-side', type: 'frame', name: 'Activity panel', width: 352, layout: 'vertical',
-                  gap: 16, padding: 24, cornerRadius: 16, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                  id: 'db-side', type: 'frame', name: 'Activity panel', width: 368, layout: 'vertical',
+                  gap: SPACE.md, padding: SPACE.lg, cornerRadius: RADIUS.lg,
+                  fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
                   children: [
                     { id: 'db-side-title', type: 'text', content: 'Recent activity', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
-                    { id: 'db-act-1', type: 'text', content: 'Activity item — to confirm', fontSize: 14, color: COLOR.textSecondary, lineHeight: 1.5 },
-                    { id: 'db-act-2', type: 'text', content: 'Activity item — to confirm', fontSize: 14, color: COLOR.textSecondary, lineHeight: 1.5 },
-                    { id: 'db-act-3', type: 'text', content: 'Activity item — to confirm', fontSize: 14, color: COLOR.textSecondary, lineHeight: 1.5 },
+                    activityRow('db-act-1', 'git-commit'),
+                    activityRow('db-act-2', 'user-plus'),
+                    activityRow('db-act-3', 'file-text'),
                   ],
                 },
               ],
@@ -639,26 +812,26 @@ const auth: Structure = {
   nodes: [
     {
       id: 'au-page', type: 'frame', name: 'Page', width: '100%', layout: 'vertical',
-      alignItems: 'center', justifyContent: 'center', padding: 48, fill: COLOR.bgPrimary,
+      alignItems: 'center', justifyContent: 'center', padding: SPACE.xl2, fill: COLOR.bgPrimary,
       children: [
         {
-          id: 'au-card', type: 'frame', name: 'Card', width: 400, layout: 'vertical', gap: 24,
-          padding: 32, cornerRadius: 16, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+          id: 'au-card', type: 'frame', name: 'Card', width: 400, layout: 'vertical', gap: SPACE.lg,
+          padding: SPACE.xl, cornerRadius: RADIUS.lg, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
           children: [
             {
-              id: 'au-head', type: 'frame', width: '100%', layout: 'vertical', gap: 8,
+              id: 'au-head', type: 'frame', width: '100%', layout: 'vertical', gap: SPACE.xs,
               children: [
                 { id: 'au-title', type: 'text', content: 'Sign in', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary },
                 { id: 'au-sub', type: 'text', content: 'Body copy — one supporting line.', fontSize: 14, color: COLOR.textSecondary, lineHeight: 1.5 },
               ],
             },
             {
-              id: 'au-fields', type: 'frame', width: '100%', layout: 'vertical', gap: 16,
+              id: 'au-fields', type: 'frame', width: '100%', layout: 'vertical', gap: SPACE.md,
               children: [field('au-email', 'Email'), field('au-password', 'Password')],
             },
             {
               id: 'au-submit', type: 'frame', name: 'Submit', width: '100%', layout: 'horizontal',
-              alignItems: 'center', justifyContent: 'center', padding: [8, 24], cornerRadius: 8, fill: COLOR.accent,
+              alignItems: 'center', justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
               children: [{ id: 'au-submit-label', type: 'text', content: 'Continue', fontSize: 16, fontWeight: 600, color: COLOR.bgPrimary }],
             },
             { id: 'au-alt', type: 'text', content: 'Secondary link', fontSize: 14, fontWeight: 500, color: COLOR.accent, textAlign: 'center' },
@@ -679,17 +852,17 @@ const pricing: Structure = {
   nodes: [
     {
       id: 'pr-page', type: 'frame', name: 'Page', width: '100%', layout: 'vertical',
-      alignItems: 'center', gap: 48, padding: 48, fill: COLOR.bgPrimary,
+      alignItems: 'center', gap: SPACE.xl2, padding: SPACE.xl2, fill: COLOR.bgPrimary,
       children: [
         {
-          id: 'pr-head', type: 'frame', name: 'Header', width: '100%', layout: 'vertical', gap: 16, alignItems: 'center',
+          id: 'pr-head', type: 'frame', name: 'Header', width: '100%', layout: 'vertical', gap: SPACE.md, alignItems: 'center',
           children: [
             { id: 'pr-title', type: 'text', content: 'Pricing', fontSize: 40, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.2 },
             { id: 'pr-sub', type: 'text', content: 'Body copy — one supporting line about the plans.', fontSize: 16, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 560 },
           ],
         },
         {
-          id: 'pr-tiers', type: 'frame', name: 'Tiers', layout: 'horizontal', gap: 24, wrap: true, responsive: 'wrap',
+          id: 'pr-tiers', type: 'frame', name: 'Tiers', layout: 'horizontal', gap: SPACE.lg, wrap: true, responsive: 'wrap',
           children: [tier('pr-tier-1', 'Starter'), tier('pr-tier-2', 'Pro'), tier('pr-tier-3', 'Scale')],
         },
       ],
@@ -699,29 +872,84 @@ const pricing: Structure = {
 
 // ── settings (Phase 20) ───────────────────────────────────────────────────
 // A centered settings column: heading over a card of toggle rows with dividers.
+/** A settings section: a group header (title + one descriptive line) over a
+ * card of rows. */
+function settingsSection(id: string, title: string, rows: SceneNode[]): SceneNode {
+  return {
+    id, type: 'frame', name: title, width: '100%', layout: 'vertical', gap: SPACE.sm,
+    children: [
+      {
+        id: `${id}-head`, type: 'frame', name: 'Section header', width: '100%', layout: 'vertical', gap: SPACE.xxs,
+        children: [
+          { id: `${id}-title`, type: 'text', content: title, fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
+          { id: `${id}-desc`, type: 'text', content: 'Section description — to confirm', fontSize: 14, color: COLOR.textSecondary },
+        ],
+      },
+      {
+        id: `${id}-card`, type: 'frame', name: 'Card', width: '100%', layout: 'vertical',
+        cornerRadius: RADIUS.lg, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
+        children: rows,
+      },
+    ],
+  };
+}
+
 const settings: Structure = {
   name: 'settings',
   description:
-    'A settings screen — heading over a single card of preference rows (label + description + a real toggle), split by hairline dividers. The workhorse of preference / account screens.',
+    'A settings screen with real anatomy — page title, grouped sections (each a header + description over a card of preference rows), a danger zone, and a footer action bar with save/cancel. The error-state story coheres: a failed save has a visible save control to point at.',
   axes: { heroTreatment: 'none', density: 'balanced', rhythm: 'uniform', alignment: 'left' },
   nodes: [
     {
       id: 'st-page', type: 'frame', name: 'Page', width: '100%', layout: 'vertical',
-      alignItems: 'center', gap: 24, padding: 48, fill: COLOR.bgPrimary,
+      alignItems: 'center', gap: SPACE.lg, padding: SPACE.xl2, fill: COLOR.bgPrimary,
       children: [
         {
-          id: 'st-col', type: 'frame', name: 'Column', width: 720, layout: 'vertical', gap: 24,
+          id: 'st-col', type: 'frame', name: 'Column', width: 720, layout: 'vertical', gap: SPACE.xl,
           children: [
-            { id: 'st-title', type: 'text', content: 'Settings', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary },
+            { id: 'st-title', type: 'text', content: 'Settings', fontSize: TYPE.title, color: COLOR.textPrimary },
+            settingsSection('st-sec-general', 'General', [
+              settingsRow('st-row-1', true),
+              { id: 'st-div-1', type: 'frame', width: '100%', height: 1, fill: COLOR.border },
+              settingsRow('st-row-2', false),
+            ]),
+            settingsSection('st-sec-notify', 'Notifications', [
+              settingsRow('st-row-3', true),
+              { id: 'st-div-2', type: 'frame', width: '100%', height: 1, fill: COLOR.border },
+              settingsRow('st-row-4', true),
+            ]),
             {
-              id: 'st-card', type: 'frame', name: 'Card', width: '100%', layout: 'vertical',
-              cornerRadius: 16, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+              id: 'st-danger', type: 'frame', name: 'Danger zone', width: '100%', layout: 'vertical', gap: SPACE.sm,
               children: [
-                settingsRow('st-row-1', true),
-                { id: 'st-div-1', type: 'frame', width: '100%', height: 1, fill: COLOR.border },
-                settingsRow('st-row-2', false),
-                { id: 'st-div-2', type: 'frame', width: '100%', height: 1, fill: COLOR.border },
-                settingsRow('st-row-3', true),
+                { id: 'st-danger-title', type: 'text', content: 'Danger zone', fontSize: 16, fontWeight: 600, color: '$danger' },
+                {
+                  id: 'st-danger-card', type: 'frame', name: 'Card', width: '100%', layout: 'horizontal',
+                  alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md, padding: SPACE.lg,
+                  cornerRadius: RADIUS.lg, fill: COLOR.bgSurface, stroke: '$danger', strokeWidth: 1,
+                  children: [
+                    {
+                      id: 'st-danger-copy', type: 'frame', name: 'Copy', layout: 'vertical', gap: SPACE.xxs,
+                      children: [
+                        { id: 'st-danger-label', type: 'text', content: 'Destructive action — TBD', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
+                        { id: 'st-danger-desc', type: 'text', content: 'Consequence — to confirm', fontSize: 14, color: COLOR.textSecondary },
+                      ],
+                    },
+                    {
+                      id: 'st-danger-btn', type: 'frame', name: 'Destructive button', layout: 'horizontal', alignItems: 'center',
+                      justifyContent: 'center', padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm,
+                      fill: 'transparent', stroke: '$danger', strokeWidth: 1,
+                      children: [{ id: 'st-danger-btn-label', type: 'text', content: 'Delete — TBD', fontSize: 14, fontWeight: 600, color: '$danger' }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'st-footer', type: 'frame', name: 'Footer actions', width: '100%', layout: 'horizontal',
+              justifyContent: 'end', alignItems: 'center', gap: SPACE.xs,
+              children: [
+                button('st-cancel', 'Cancel', 'transparent', COLOR.textSecondary, COLOR.border),
+                button('st-save', 'Save changes', COLOR.accent, COLOR.bgPrimary),
               ],
             },
           ],
@@ -741,10 +969,10 @@ const onboarding: Structure = {
   nodes: [
     {
       id: 'ob-page', type: 'frame', name: 'Page', width: '100%', layout: 'vertical',
-      alignItems: 'center', justifyContent: 'center', gap: 16, padding: 48, fill: COLOR.bgPrimary,
+      alignItems: 'center', justifyContent: 'center', gap: SPACE.md, padding: SPACE.xl2, fill: COLOR.bgPrimary,
       children: [
         {
-          id: 'ob-glyph', type: 'frame', name: 'Glyph', width: 64, height: 64, cornerRadius: 16,
+          id: 'ob-glyph', type: 'frame', name: 'Glyph', width: 64, height: 64, cornerRadius: RADIUS.lg,
           fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
           layout: 'vertical', alignItems: 'center', justifyContent: 'center',
           children: [{ id: 'ob-glyph-icon', type: 'icon', icon: 'sparkles', iconSize: 28, iconColor: COLOR.accent }],
@@ -753,7 +981,7 @@ const onboarding: Structure = {
         { id: 'ob-body', type: 'text', content: 'Body copy — explain the empty state and the next step in a sentence.', fontSize: 16, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 420 },
         {
           id: 'ob-cta', type: 'frame', name: 'Primary action', layout: 'horizontal', alignItems: 'center',
-          justifyContent: 'center', padding: [8, 24], cornerRadius: 8, fill: COLOR.accent,
+          justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
           children: [{ id: 'ob-cta-label', type: 'text', content: 'Primary action', fontSize: 16, fontWeight: 600, color: COLOR.bgPrimary }],
         },
       ],
@@ -764,19 +992,21 @@ const onboarding: Structure = {
 // ── component structures (Phase 16 slice D) ────────────────────────────────
 // Reusable fragments stamped under any target node via apply_structure
 // targetId, repeatably — template ids get re-keyed per stamp. Same theming
-// split as pages: literal geometry, $color tokens. Placeholder copy only (C8).
+// split as pages: $space-*/$radius-*/$elevation.* geometry tokens, $color
+// tokens (Phase 27 slice B — density used to be literal, now it's tokenized
+// too). Placeholder copy only (C8).
 
 const formField: Structure = {
   name: 'form-field',
   kind: 'component',
   description: 'A labeled form field: label, input box, and help text. Stamp once per field; set the label/help via the returned id map.',
   nodes: [{
-    id: 'ff', type: 'frame', name: 'Form field', width: '100%', layout: 'vertical', gap: 8,
+    id: 'ff', type: 'frame', name: 'Form field', width: '100%', layout: 'vertical', gap: SPACE.xs,
     children: [
       { id: 'ff-label', type: 'text', content: 'Field label', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
       {
         id: 'ff-input', type: 'frame', name: 'Input', width: '100%', height: 44, layout: 'horizontal', alignItems: 'center',
-        padding: [8, 16], cornerRadius: 8, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
+        padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
         children: [{ id: 'ff-placeholder', type: 'text', content: 'Placeholder — to confirm', fontSize: 16, color: COLOR.textSecondary }],
       },
       { id: 'ff-help', type: 'text', content: 'Help text — to confirm', fontSize: 12, color: COLOR.textSecondary },
@@ -790,11 +1020,11 @@ const toggleRow: Structure = {
   description: 'A settings row: label + description on the left, a toggle on the right. The workhorse of preference screens.',
   nodes: [{
     id: 'tr', type: 'frame', name: 'Toggle row', width: '100%', layout: 'horizontal', alignItems: 'center',
-    justifyContent: 'space-between', gap: 16, padding: [8, 16], cornerRadius: 10,
+    justifyContent: 'space-between', gap: SPACE.md, padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.md,
     fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
     children: [
       {
-        id: 'tr-copy', type: 'frame', name: 'Copy', layout: 'vertical', gap: 4,
+        id: 'tr-copy', type: 'frame', name: 'Copy', layout: 'vertical', gap: SPACE.xs2,
         children: [
           { id: 'tr-label', type: 'text', content: 'Setting label', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
           { id: 'tr-desc', type: 'text', content: 'Setting description — to confirm', fontSize: 12, color: COLOR.textSecondary },
@@ -818,18 +1048,18 @@ const toolbar: Structure = {
   description: 'A list-view toolbar: search field on the left, a filter and a primary action on the right.',
   nodes: [{
     id: 'tb', type: 'frame', name: 'Toolbar', width: '100%', layout: 'horizontal', alignItems: 'center',
-    justifyContent: 'space-between', gap: 16,
+    justifyContent: 'space-between', gap: SPACE.md,
     children: [
       {
         id: 'tb-search', type: 'frame', name: 'Search', width: 280, height: 36, layout: 'horizontal', alignItems: 'center',
-        gap: 8, padding: [8, 16], cornerRadius: 8, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
+        gap: SPACE.xs, padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
         children: [
           { id: 'tb-search-icon', type: 'icon', icon: 'search', iconSize: 16, iconColor: COLOR.textSecondary },
           { id: 'tb-search-text', type: 'text', content: 'Search — to confirm', fontSize: 13, color: COLOR.textSecondary },
         ],
       },
       {
-        id: 'tb-actions', type: 'frame', layout: 'horizontal', alignItems: 'center', gap: 8,
+        id: 'tb-actions', type: 'frame', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
         children: [
           button('tb-filter', 'Filter', COLOR.bgElevated, COLOR.textPrimary, COLOR.border),
           button('tb-primary', 'Primary action', COLOR.accent, COLOR.bgPrimary),
@@ -839,42 +1069,47 @@ const toolbar: Structure = {
   }],
 };
 
-/** A data-table row: identity cell (avatar + name/email), role chip, status, actions. */
+/** A data-table row: identity (avatar + name/email), role chip, status dot,
+ * right-aligned numeric cell, actions. */
 function tableRow(id: string): SceneNode {
   return {
     id, type: 'frame', name: 'Row', width: '100%', layout: 'horizontal', alignItems: 'center',
-    padding: [8, 16], gap: 16, stroke: COLOR.border, strokeWidth: 1,
+    padding: [SPACE.xs, SPACE.md], gap: SPACE.md, stroke: COLOR.border, strokeWidth: 1,
     children: [
       {
-        id: `${id}-identity`, type: 'frame', width: '40%', layout: 'horizontal', alignItems: 'center', gap: 8,
+        id: `${id}-identity`, type: 'frame', width: '34%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
         children: [
           { id: `${id}-avatar`, type: 'ellipse', width: 32, height: 32, fill: COLOR.bgElevated },
           {
-            id: `${id}-id-copy`, type: 'frame', name: 'Identity', layout: 'vertical', gap: 4,
+            id: `${id}-id-copy`, type: 'frame', name: 'Identity', layout: 'vertical',
             children: [
-              { id: `${id}-name`, type: 'text', content: 'Name — to confirm', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, tabularNums: true },
-              { id: `${id}-email`, type: 'text', content: 'email — to confirm', fontSize: 12, color: COLOR.textSecondary, tabularNums: true },
+              { id: `${id}-name`, type: 'text', content: 'Name — to confirm', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+              { id: `${id}-email`, type: 'text', content: 'email — to confirm', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
             ],
           },
         ],
       },
       {
-        id: `${id}-role`, type: 'frame', width: '20%', layout: 'horizontal',
+        id: `${id}-role`, type: 'frame', width: '18%', layout: 'horizontal',
         children: [{
-          id: `${id}-role-chip`, type: 'frame', layout: 'horizontal', alignItems: 'center', padding: [4, 8],
+          id: `${id}-role-chip`, type: 'frame', layout: 'horizontal', alignItems: 'center', padding: [SPACE.xs2, SPACE.xs],
           cornerRadius: 999, fill: COLOR.bgElevated,
           children: [{ id: `${id}-role-text`, type: 'text', content: 'Role', fontSize: 12, color: COLOR.textSecondary }],
         }],
       },
       {
-        id: `${id}-status`, type: 'frame', width: '25%', layout: 'horizontal', alignItems: 'center', gap: 8,
+        id: `${id}-status`, type: 'frame', width: '18%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
         children: [
-          { id: `${id}-status-toggle`, type: 'toggle', checked: true, width: 36, height: 20 },
+          { id: `${id}-status-dot`, type: 'ellipse', width: 8, height: 8, fill: '$success' },
           { id: `${id}-status-text`, type: 'text', content: 'Status', fontSize: 12, color: COLOR.textSecondary },
         ],
       },
       {
-        id: `${id}-actions`, type: 'frame', width: '15%', layout: 'horizontal', justifyContent: 'end',
+        id: `${id}-amount`, type: 'frame', width: '18%', layout: 'horizontal', justifyContent: 'end',
+        children: [{ id: `${id}-amount-text`, type: 'text', content: 'Amount — TBD', fontSize: 14, color: COLOR.textPrimary, tabularNums: true }],
+      },
+      {
+        id: `${id}-actions`, type: 'frame', width: '12%', layout: 'horizontal', justifyContent: 'end',
         children: [{ id: `${id}-actions-icon`, type: 'icon', icon: 'ellipsis', iconSize: 18, iconColor: COLOR.textSecondary }],
       },
     ],
@@ -891,27 +1126,53 @@ function tableHeaderCell(id: string, label: string, width: string, alignEnd = fa
 const dataTable: Structure = {
   name: 'data-table',
   kind: 'component',
-  description: 'A high-fidelity data table: header row plus three placeholder rows (avatar + name/email, role chip, status toggle, actions). Copy rows with batch_design C ops to extend; ~80 hand-placed nodes for free.',
+  description: 'A high-fidelity data table: header row, three placeholder rows (avatar + name/email, role chip, status dot, right-aligned numeric cell, actions), and a pagination footer. Copy rows with batch_design C ops to extend; ~90 hand-placed nodes for free.',
   nodes: [{
     id: 'dt', type: 'frame', name: 'Data table', width: '100%', layout: 'vertical',
-    cornerRadius: 12, overflow: 'hidden', fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+    cornerRadius: RADIUS.md, overflow: 'hidden', fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
     children: [
       {
         id: 'dt-header', type: 'frame', name: 'Header', width: '100%', layout: 'horizontal', alignItems: 'center',
-        padding: [8, 16], gap: 16, fill: COLOR.bgElevated,
+        padding: [SPACE.xs, SPACE.md], gap: SPACE.md, fill: COLOR.bgElevated,
         children: [
-          tableHeaderCell('dt-h-identity', 'Name', '40%'),
-          tableHeaderCell('dt-h-role', 'Role', '20%'),
-          tableHeaderCell('dt-h-status', 'Status', '25%'),
-          tableHeaderCell('dt-h-actions', 'Actions', '15%', true),
+          tableHeaderCell('dt-h-identity', 'Name', '34%'),
+          tableHeaderCell('dt-h-role', 'Role', '18%'),
+          tableHeaderCell('dt-h-status', 'Status', '18%'),
+          tableHeaderCell('dt-h-amount', 'Amount', '18%', true),
+          tableHeaderCell('dt-h-actions', 'Actions', '12%', true),
         ],
       },
-      tableRow('dt-row1'),
-      tableRow('dt-row2'),
-      tableRow('dt-row3'),
+      tableRow('dt-r1'),
+      tableRow('dt-r2'),
+      tableRow('dt-r3'),
+      {
+        id: 'dt-footer', type: 'frame', name: 'Pagination', width: '100%', layout: 'horizontal',
+        alignItems: 'center', justifyContent: 'space-between', padding: [SPACE.xs, SPACE.md], fill: COLOR.bgElevated,
+        children: [
+          { id: 'dt-count', type: 'text', content: 'Row count — TBD', fontSize: 12, color: COLOR.textSecondary, tabularNums: true },
+          {
+            id: 'dt-pager', type: 'frame', name: 'Pager', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+            children: [
+              {
+                id: 'dt-prev', type: 'frame', name: 'Previous page', width: 28, height: 28, cornerRadius: RADIUS.sm,
+                fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+                children: [{ id: 'dt-prev-icon', type: 'icon', icon: 'chevron-left', iconSize: 14, iconColor: COLOR.textSecondary }],
+              },
+              {
+                id: 'dt-next', type: 'frame', name: 'Next page', width: 28, height: 28, cornerRadius: RADIUS.sm,
+                fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+                children: [{ id: 'dt-next-icon', type: 'icon', icon: 'chevron-right', iconSize: 14, iconColor: COLOR.textSecondary }],
+              },
+            ],
+          },
+        ],
+      },
     ],
   }],
 };
+
 
 // ── Phase 24 slice B — state scaffolds ──────────────────────────────────────
 // The cheap way to satisfy the coverage demand (slice C): a designed empty
@@ -923,14 +1184,14 @@ const emptyState: Structure = {
   description: 'A designed empty state: icon, title, one-line hint, primary action. Stamp it where the data would be — an empty screen is a first-run experience, never a bare void.',
   nodes: [{
     id: 'es', type: 'frame', name: 'Empty state', width: '100%', layout: 'vertical', alignItems: 'center',
-    gap: 8, padding: [48, 24],
+    gap: SPACE.xs, padding: [SPACE.xl2, SPACE.lg],
     children: [
       { id: 'es-icon', type: 'icon', icon: 'inbox', iconSize: 28, iconColor: COLOR.textSecondary },
       { id: 'es-title', type: 'text', content: 'Nothing here yet', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
       { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 12, color: COLOR.textSecondary },
       {
-        id: 'es-cta', type: 'frame', name: 'CTA', layout: 'horizontal', alignItems: 'center', gap: 8,
-        padding: [8, 16], cornerRadius: 8, fill: COLOR.accent, width: 'fit-content',
+        id: 'es-cta', type: 'frame', name: 'CTA', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
+        padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm, fill: COLOR.accent, width: 'fit-content',
         children: [
           // bg-primary as on-accent text is theme-adaptive: near-white on the
           // dark accent in light mode, near-black on the light accent in dark
@@ -951,12 +1212,12 @@ function skeletonRow(id: string): SceneNode {
   });
   return {
     id, type: 'frame', name: 'Skeleton row', width: '100%', layout: 'horizontal', alignItems: 'center',
-    padding: [12, 16], gap: 16, borderTop: { width: 1, color: COLOR.border },
+    padding: [SPACE.sm, SPACE.md], gap: SPACE.md, borderTop: { width: 1, color: COLOR.border },
     children: [
       {
-        id: `${id}-identity`, type: 'frame', width: '40%', layout: 'horizontal', alignItems: 'center', gap: 8,
+        id: `${id}-identity`, type: 'frame', width: '40%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
         children: [
-          { id: `${id}-avatar`, type: 'skeleton', width: 32, height: 32, cornerRadius: 16 },
+          { id: `${id}-avatar`, type: 'skeleton', width: 32, height: 32, cornerRadius: RADIUS.lg },
           { id: `${id}-name`, type: 'skeleton', width: '55%', height: 12 },
         ],
       },
@@ -973,11 +1234,11 @@ const skeletonTable: Structure = {
   description: 'Loading state for a data table: the real header row plus skeleton rows matching data-table geometry, so the loaded table lands without layout shift. Pulses subtly in the live viewer; always static in screenshots.',
   nodes: [{
     id: 'skt', type: 'frame', name: 'Skeleton table', width: '100%', layout: 'vertical',
-    cornerRadius: 12, overflow: 'hidden', fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+    cornerRadius: RADIUS.md, overflow: 'hidden', fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
     children: [
       {
         id: 'skt-header', type: 'frame', name: 'Header', width: '100%', layout: 'horizontal', alignItems: 'center',
-        padding: [8, 16], gap: 16, fill: COLOR.bgElevated,
+        padding: [SPACE.xs, SPACE.md], gap: SPACE.md, fill: COLOR.bgElevated,
         children: [
           tableHeaderCell('skt-h-identity', 'Name', '40%'),
           tableHeaderCell('skt-h-role', 'Role', '20%'),
@@ -998,13 +1259,28 @@ const skeletonCard: Structure = {
   kind: 'component',
   description: 'Loading state for a card: media block, title bar, and two text lines as skeletons — same silhouette as the loaded card.',
   nodes: [{
-    id: 'skc', type: 'frame', name: 'Skeleton card', width: '100%', layout: 'vertical', gap: 12,
-    padding: 16, cornerRadius: 12, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+    id: 'skc', type: 'frame', name: 'Skeleton card', width: '100%', layout: 'vertical', gap: SPACE.sm,
+    padding: SPACE.md, cornerRadius: RADIUS.md, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
     children: [
-      { id: 'skc-media', type: 'skeleton', width: '100%', height: 120, cornerRadius: 8 },
+      { id: 'skc-media', type: 'skeleton', width: '100%', height: 120, cornerRadius: RADIUS.sm },
       { id: 'skc-title', type: 'skeleton', width: '60%', height: 14 },
       { id: 'skc-line1', type: 'skeleton', width: '100%', height: 10 },
       { id: 'skc-line2', type: 'skeleton', width: '80%', height: 10 },
+    ],
+  }],
+};
+
+const skeletonStatCard: Structure = {
+  name: 'skeleton-stat-card',
+  kind: 'component',
+  description: 'Loading state for a stat card: label bar, value bar, and delta bar as skeletons — same silhouette as the loaded stat. Stamp one per stat in the row so a loading dashboard skeletons EVERY data surface, not just the table.',
+  nodes: [{
+    id: 'sks', type: 'frame', name: 'Skeleton stat', width: 300, layout: 'vertical', gap: SPACE.xs,
+    padding: SPACE.lg, cornerRadius: RADIUS.md, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
+    children: [
+      { id: 'sks-label', type: 'skeleton', width: '40%', height: 10 },
+      { id: 'sks-value', type: 'skeleton', width: '60%', height: 24 },
+      { id: 'sks-delta', type: 'skeleton', width: '50%', height: 10 },
     ],
   }],
 };
@@ -1031,6 +1307,7 @@ const structureMap = new Map<string, Structure>([
   ['empty-state', emptyState],
   ['skeleton-table', skeletonTable],
   ['skeleton-card', skeletonCard],
+  ['skeleton-stat-card', skeletonStatCard],
 ]);
 
 export function listStructures(): { name: string; kind: 'page' | 'component'; description: string; axes?: StructureAxes }[] {
@@ -1059,6 +1336,33 @@ const DEFAULT_SCAFFOLD_COLORS: Record<string, string> = {
   'text-secondary': '#ffffffa0',
   'accent': '#3b82f6',
   'border': '#ffffff1a',
+  // Status colors (Phase 27 v2 archetypes: delta chips, danger zones) —
+  // AA against the dark defaults above; generated systems override.
+  'success': '#4ADE80',
+  'warning': '#FBBF24',
+  'danger': '#F87171',
+};
+
+/** Phase 27 slice B — default values for the non-color token namespaces the
+ * scaffolds now reference. These ARE the pre-27 literal values, so an
+ * unthemed stamp renders pixel-identical to before; generate_design_system
+ * overrides them with the personality's stances. */
+const DEFAULT_SCAFFOLD_SPACING: Record<string, number> = {
+  'space-3xs': 2, 'space-2xs': 4, 'space-xs': 8, 'space-sm': 12,
+  'space-md': 16, 'space-lg': 24, 'space-xl': 32, 'space-2xl': 48, 'space-3xl': 64,
+};
+const DEFAULT_SCAFFOLD_RADIUS: Record<string, number> = {
+  'radius-sm': 8, 'radius-md': 12, 'radius-lg': 16,
+};
+const DEFAULT_SCAFFOLD_ELEVATION: Record<string, Array<{ x: number; y: number; blur: number; spread?: number; color: string }>> = {
+  flat: [{ x: 0, y: 1, blur: 2, spread: 0, color: 'rgba(16, 24, 40, 0.05)' }],
+  raised: [
+    { x: 0, y: 1, blur: 2, spread: 0, color: 'rgba(16, 24, 40, 0.06)' },
+    { x: 0, y: 2, blur: 4, spread: -1, color: 'rgba(16, 24, 40, 0.08)' },
+  ],
+};
+const DEFAULT_SCAFFOLD_TYPOGRAPHY: Record<string, { fontSize: number; fontWeight?: number; letterSpacing?: number }> = {
+  title: { fontSize: 28, fontWeight: 700, letterSpacing: -0.5 },   // page titles — pre-27 literal + display tracking
 };
 
 /** Node fields that may carry a `$color` token ref (the theming split). */
@@ -1086,6 +1390,8 @@ export interface ApplyStructureResult {
   placeholders: { id: string; role: string }[];
   /** Color tokens seeded with neutral defaults because they were unresolved. */
   seededColors: string[];
+  /** Phase 27 — spacing/radius/elevation/typography tokens seeded the same way. */
+  seededTokens?: string[];
 }
 
 function findById(root: SceneNode, id: string): SceneNode | null {
@@ -1133,7 +1439,7 @@ function rekeyComponentNodes(canvas: Canvas, structureName: string, nodes: Scene
 export function applyStructure(
   canvas: Canvas,
   structureName: string,
-  opts: { replace?: boolean; existingColors?: Set<string>; targetId?: string } = {},
+  opts: { replace?: boolean; existingColors?: Set<string>; existingTokens?: Set<string>; targetId?: string } = {},
 ): ApplyStructureResult {
   const structure = getStructure(structureName);
   if (!structure) {
@@ -1192,6 +1498,7 @@ export function applyStructure(
   // One pass: collect fillable placeholders + referenced color tokens.
   const placeholders: { id: string; role: string }[] = [];
   const referenced = new Set<string>();
+  const referencedOther = new Set<string>();  // spacing / radius / elevation / typography refs
   for (const root of inserted) {
     walkNodes(root, (n) => {
       if (n.type === 'text' && typeof n.content === 'string') placeholders.push({ id: n.id, role: n.content });
@@ -1204,6 +1511,13 @@ export function applyStructure(
       for (const s of n.series ?? []) {
         if (typeof s?.stroke === 'string' && s.stroke.startsWith('$')) referenced.add(s.stroke.slice(1));
       }
+      // Phase 27 slice B — density/depth/type refs (seeded like colors below).
+      const collect = (v: unknown): void => {
+        if (typeof v === 'string' && v.startsWith('$')) referencedOther.add(v.slice(1));
+        if (Array.isArray(v)) v.forEach(collect);
+      };
+      collect(n.gap); collect(n.rowGap); collect(n.padding); collect(n.cornerRadius);
+      collect(n.shadow); collect(n.fontSize);
     });
   }
 
@@ -1221,6 +1535,40 @@ export function applyStructure(
     seededColors.push(token);
   }
 
+  // Seed the non-color namespaces the same way (defaults = pre-27 literals).
+  // `existingTokens` carries every merged token name resolvable on this
+  // canvas — anything already resolvable (e.g. a generated design system at
+  // any layer) is left alone.
+  const existingOther = opts.existingTokens ?? new Set<string>();
+  const seededTokens: string[] = [];
+  // Spacing and radius seed their WHOLE ladder on first touch: the spacing
+  // check treats defined tokens as the authoritative scale, so a sparse seed
+  // ({sm, md} only) would turn every other literal on the canvas off-scale.
+  const seedLadder = (cat: 'spacing' | 'radius', defaults: Record<string, number>): void => {
+    for (const [k, v] of Object.entries(defaults)) {
+      if (existingOther.has(k) || (canvas.variables[cat] as Record<string, number> | undefined)?.[k] !== undefined) continue;
+      canvas.variables[cat] = { ...canvas.variables[cat], [k]: v };
+      seededTokens.push(k);
+    }
+  };
+  for (const name of referencedOther) {
+    if (existingOther.has(name)) continue;
+    if (DEFAULT_SCAFFOLD_SPACING[name] !== undefined) {
+      seedLadder('spacing', DEFAULT_SCAFFOLD_SPACING);
+    } else if (DEFAULT_SCAFFOLD_RADIUS[name] !== undefined) {
+      seedLadder('radius', DEFAULT_SCAFFOLD_RADIUS);
+    } else if (name.startsWith('elevation.')) {
+      const key = name.slice('elevation.'.length);
+      if (DEFAULT_SCAFFOLD_ELEVATION[key] !== undefined) {
+        canvas.variables.elevation = { ...canvas.variables.elevation, [key]: DEFAULT_SCAFFOLD_ELEVATION[key] };
+        seededTokens.push(name);
+      }
+    } else if (DEFAULT_SCAFFOLD_TYPOGRAPHY[name] !== undefined) {
+      canvas.variables.typography = { ...canvas.variables.typography, [name]: DEFAULT_SCAFFOLD_TYPOGRAPHY[name] };
+      seededTokens.push(name);
+    }
+  }
+
   return {
     applied: structure.name,
     kind,
@@ -1229,6 +1577,7 @@ export function applyStructure(
     ...(idMap ? { idMap } : {}),
     placeholders,
     seededColors: seededColors.sort(),
+    ...(seededTokens.length ? { seededTokens: seededTokens.sort() } : {}),
   };
 }
 
