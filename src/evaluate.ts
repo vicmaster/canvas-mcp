@@ -1538,6 +1538,132 @@ function generateSummary(overall: number, categories: CategoryScore[], issues: E
 
 // --- Main orchestrator ---
 
+// ── Phase 27 slice C — usability beyond contrast ────────────────────────────
+// Mechanically checkable UX floors: controls big enough to hit (WCAG 2.5.8,
+// gated as ERROR — same standing as contrast), labels associated with their
+// controls (warning), and honest action copy (info). Runs on the RESOLVED
+// tree so padding/dimensions are numbers.
+
+const CONTROL_TYPES = new Set(['toggle', 'checkbox', 'radio', 'select']);
+/** Renderer defaults (controlSize + select's padding-derived height). */
+const CONTROL_DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
+  toggle: { w: 44, h: 24 },
+  checkbox: { w: 18, h: 18 },
+  radio: { w: 18, h: 18 },
+  select: { w: 200, h: 36 },
+};
+
+function paddingBox(n: SceneNode): { v: number; h: number } {
+  const p = n.padding;
+  if (typeof p === 'number') return { v: p * 2, h: p * 2 };
+  if (Array.isArray(p) && p.every((x) => typeof x === 'number')) {
+    const a = p as number[];
+    if (a.length === 2) return { v: a[0] * 2, h: a[1] * 2 };
+    if (a.length === 4) return { v: a[0] + a[2], h: a[1] + a[3] };
+  }
+  return { v: 0, h: 0 };
+}
+
+function checkUsability(entries: NodeEntry[], rootWidth: number): CheckResult {
+  const issues: EvaluationIssue[] = [];
+  let score = 100;
+
+  const parentOf = new Map<string, SceneNode | null>();
+  for (const en of entries) parentOf.set(en.node.id, en.parent);
+  const countControls = (n: SceneNode): number => {
+    let c = CONTROL_TYPES.has(n.type) ? 1 : 0;
+    for (const ch of n.children ?? []) c += countControls(ch);
+    return c;
+  };
+  const hasText = (n: SceneNode): boolean =>
+    (n.type === 'text' && typeof n.content === 'string' && n.content.trim().length > 0)
+    || (n.children ?? []).some(hasText);
+
+  const touchFirst = rootWidth > 0 && rootWidth < 500;   // a phone-width artboard
+
+  for (const { node } of entries) {
+    if (CONTROL_TYPES.has(node.type)) {
+      const def = CONTROL_DEFAULT_SIZE[node.type];
+      let w = typeof node.width === 'number' ? node.width : def.w;
+      let h = typeof node.height === 'number' ? node.height : def.h;
+
+      // The effective target extends to a padded ancestor row when the
+      // control is the only control inside it (the whole row is tappable by
+      // convention) — the WCAG 2.5.8 spacing model, applied structurally.
+      let cur = parentOf.get(node.id) ?? null;
+      for (let hop = 0; hop < 2 && cur && Math.min(w, h) < 24; hop++) {
+        if (countControls(cur) === 1) {
+          const pad = paddingBox(cur);
+          w += pad.h;
+          h += pad.v;
+        }
+        cur = parentOf.get(cur.id) ?? null;
+      }
+
+      if (Math.min(w, h) < 24) {
+        score -= 25;
+        issues.push({
+          category: 'usability',
+          severity: 'error',
+          nodeId: node.id,
+          nodeName: node.name,
+          message: `${node.type} has a ${Math.round(w)}×${Math.round(h)}px effective hit target — below the 24px floor (WCAG 2.5.8).`,
+          suggestion: 'Grow the control, or give its row enough padding that the whole row is the target (a lone control inherits its padded row\'s box).',
+        });
+      } else if (touchFirst && Math.min(w, h) < 44) {
+        issues.push({
+          category: 'usability',
+          severity: 'info',
+          nodeId: node.id,
+          nodeName: node.name,
+          message: `${node.type} has a ${Math.round(w)}×${Math.round(h)}px effective hit target — fine for pointer input, but this looks like a touch-first screen (44px is the comfortable floor there).`,
+        });
+      }
+
+      // Label association: a control the user can't name is a guess. The
+      // label may sit anywhere in the padded row/group around the control
+      // (label-beside and label-above both count). Selects carry their own
+      // value/placeholder text.
+      if (node.type !== 'select') {
+        let scope = parentOf.get(node.id) ?? null;
+        let labeled = false;
+        for (let hop = 0; hop < 2 && scope && !labeled; hop++) {
+          labeled = hasText(scope);
+          scope = parentOf.get(scope.id) ?? null;
+        }
+        if (!labeled) {
+          score -= 10;
+          issues.push({
+            category: 'usability',
+            severity: 'warning',
+            nodeId: node.id,
+            nodeName: node.name,
+            message: `${node.type} has no text label in its row or group — screen readers and scanning users get a bare control.`,
+            suggestion: 'Put a text label in the control\'s row (label-beside) or directly above it (label-above).',
+          });
+        }
+      }
+    }
+
+    // Vague action copy — exact matches only, so body prose never flags.
+    if (node.type === 'text' && typeof node.content === 'string') {
+      const copy = node.content.trim().toLowerCase();
+      if (copy === 'click here' || copy === 'learn more' || copy === 'read more' || copy === 'submit') {
+        issues.push({
+          category: 'usability',
+          severity: 'info',
+          nodeId: node.id,
+          nodeName: node.name,
+          message: `"${node.content.trim()}" is vague action copy — the label should name what happens.`,
+          suggestion: 'Name the action: "Export report", "Create project", "Save changes".',
+        });
+      }
+    }
+  }
+
+  return { score: Math.max(0, score), issues };
+}
+
 const CATEGORY_WEIGHTS = new Map([
   ['spacing', 20],
   ['color', 25],
@@ -1546,6 +1672,7 @@ const CATEGORY_WEIGHTS = new Map([
   ['consistency', 20],
   ['cliche', 15],
   ['coverage', 10],
+  ['usability', 20],
 ]);
 
 // ── Phase 24 slice C — state coverage ───────────────────────────────────────
@@ -1729,6 +1856,11 @@ export async function evaluateCanvas(
       results.set('consistency', checkConsistency(entries, consistencyCtx));
     }
   }
+  if (activeCategories.includes('usability')) {
+    const rootWidth = typeof resolvedRoot.width === 'number' ? resolvedRoot.width : 1440;
+    results.set('usability', checkUsability(entries, rootWidth));
+  }
+
   let coverageReport: EvaluationResult['coverage'];
   if (activeCategories.includes('coverage')) {
     const { result, report } = checkCoverage(canvas, options.designedStates ?? []);

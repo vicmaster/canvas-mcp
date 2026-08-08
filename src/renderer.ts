@@ -101,6 +101,7 @@ ${preconnect}<style>
   body { width: 100%; max-width: ${width}px; min-height: ${height}px; margin: 0 auto; overflow-x: hidden; font-family: ${bodyFont}; }
   img { display: block; max-width: 100%; }
   p { overflow-wrap: break-word; word-wrap: break-word; }
+  [data-focusable]:focus-visible { outline: 2px solid var(--fs-ring, #2563EB); outline-offset: 2px; }
 ${fontFaceCss}${responsiveCss}${skeletonCss}
 </style>
 </head>
@@ -474,10 +475,20 @@ function renderNode(node: SceneNode, canvas?: Canvas, registered?: ReadonlySet<s
   // arrive pre-defaulted by resolveVariables (token-aware with neutral
   // fallbacks), so the builders just consume node.fill / stroke / color.
   if (node.type === 'skeleton') return renderSkeleton(node, dataAttr);
-  if (node.type === 'toggle') return renderToggle(node, dataAttr);
-  if (node.type === 'checkbox') return renderCheckbox(node, dataAttr);
-  if (node.type === 'radio') return renderRadio(node, dataAttr);
-  if (node.type === 'select') return renderSelect(node, dataAttr);
+  // Phase 27 slice C — controls are focusable in the live viewer, with an
+  // accent-derived focus ring (:focus-visible only, so static screenshots
+  // are pixel-identical: nothing is focused in a capture).
+  // Phase 27 slice C — controls are focusable in the live viewer, with an
+  // accent-derived focus ring (:focus-visible only, so static screenshots
+  // are pixel-identical: nothing is focused in a capture). The ring color
+  // rides a CSS var on the control's own style, keeping one style attribute.
+  if (node.type === 'toggle' || node.type === 'checkbox' || node.type === 'radio' || node.type === 'select') {
+    const focusAttr = `${dataAttr} tabindex="0" data-focusable`;
+    if (node.type === 'toggle') return renderToggle(node, focusAttr);
+    if (node.type === 'checkbox') return renderCheckbox(node, focusAttr);
+    if (node.type === 'radio') return renderRadio(node, focusAttr);
+    return renderSelect(node, focusAttr);
+  }
 
   if (node.type === 'ellipse') {
     // Ensure border-radius: 50% for ellipses
@@ -685,6 +696,13 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
 // apply. Shared bits: numeric width/height with control-appropriate defaults,
 // opacity passthrough (resolveVariables sets 0.5 for disabled).
 
+/** Focus-ring color for a control: its strongest own color, accent-flavored
+ * when checked. Consumed by the [data-focusable]:focus-visible rule. */
+function focusRing(node: SceneNode): string {
+  const ring = (node.checked ? node.fill : undefined) ?? node.stroke ?? node.fill ?? '#2563EB';
+  return `--fs-ring: ${ring}`;
+}
+
 function controlSize(node: SceneNode, defW: number, defH: number): { w: number; h: number } {
   return {
     w: typeof node.width === 'number' ? node.width : defW,
@@ -724,6 +742,7 @@ function renderToggle(node: SceneNode, dataAttr: string): string {
   const knob = h - inset * 2;
   const left = node.checked ? w - knob - inset : inset;
   const track = [
+    focusRing(node),
     'position: relative', 'flex-shrink: 0',
     `width: ${w}px`, `height: ${h}px`, `border-radius: ${h / 2}px`,
     `background-color: ${node.fill}`,
@@ -742,6 +761,7 @@ function renderCheckbox(node: SceneNode, dataAttr: string): string {
   const { w, h } = controlSize(node, 18, 18);
   const radius = node.cornerRadius !== undefined && typeof node.cornerRadius === 'number' ? node.cornerRadius : 4;
   const box = [
+    focusRing(node),
     'flex-shrink: 0', 'display: flex', 'align-items: center', 'justify-content: center',
     `width: ${w}px`, `height: ${h}px`, `border-radius: ${radius}px`,
     `border: 1.5px solid ${node.stroke}`, `background-color: ${node.fill}`,
@@ -754,6 +774,7 @@ function renderCheckbox(node: SceneNode, dataAttr: string): string {
 function renderRadio(node: SceneNode, dataAttr: string): string {
   const { w, h } = controlSize(node, 18, 18);
   const ring = [
+    focusRing(node),
     'flex-shrink: 0', 'display: flex', 'align-items: center', 'justify-content: center',
     `width: ${w}px`, `height: ${h}px`, 'border-radius: 50%',
     `border: 1.5px solid ${node.stroke}`, 'background-color: transparent',
@@ -773,6 +794,7 @@ function renderSelect(node: SceneNode, dataAttr: string): string {
   const isPlaceholder = !node.value;
   const textColor = isPlaceholder ? '#9CA3AF' : node.color;
   const frame = [
+    focusRing(node),
     'display: flex', 'flex-direction: row', 'align-items: center', 'justify-content: space-between',
     'gap: 8px', 'padding: 8px 12px', `width: ${width}`,
     ...(typeof node.height === 'number' ? [`height: ${node.height}px`] : []),

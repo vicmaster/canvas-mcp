@@ -58,7 +58,7 @@ for (const personality of PERSONALITY_NAMES) {
   setVariables(canvas, vars);
   // Coverage is excluded like test-patterns does: a freshly stamped canvas
   // has no state variants yet, and this gate measures craft, not workflow.
-  const result = await evaluateCanvas(canvas, { mode: 'fast', genre: 'dashboard', categories: ['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche'] });
+  const result = await evaluateCanvas(canvas, { mode: 'fast', genre: 'dashboard', categories: ['spacing', 'color', 'typography', 'structure', 'consistency', 'cliche', 'usability'] });
   const errors = result.issues.filter((i) => i.severity === 'error');
   const cliche = result.issues.filter((i) => i.category === 'cliche');
   check('stamped dashboard: zero errors both themes', errors.length === 0, errors.slice(0, 2).map((i) => `[${i.category}] ${i.message.slice(0, 80)}`).join('; '));
