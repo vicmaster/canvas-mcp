@@ -425,7 +425,7 @@ One seed color → a full perceptual color system, written to the workspace / pr
 
 - **`primary-50` … `primary-900`** — an OKLCH ramp with perceptually even lightness steps and chroma tapered at the extremes; out-of-gamut colors clip toward lower chroma, never hue-shift. (The hand-rolled conversions are validated against Chrome's own `oklch()` parsing.)
 - **`neutral-50` … `neutral-900`** — a matched neutral carrying a whisper of the seed's hue: never dead grey, never visibly tinted.
-- **`success` / `warning` / `danger`** — status colors, hue held, each darkened from the shared band until it clears WCAG AA (4.5:1) **as text on white** — the invariant is shared contrast, not shared lightness (a raw shared-lightness danger red can read under 4:1).
+- **`success` / `warning` / `danger`** — status colors, hue held, each darkened from the shared band until it clears WCAG AA (4.5:1) **as text on the generated light page surface** (the off-white `bg-primary`, not pure white — the stricter target, so passing there implies passing on white too) — the invariant is shared contrast, not shared lightness (a raw shared-lightness danger red can read under 4:1).
 - **Semantic tokens** — `bg-primary`, `bg-surface`, `bg-elevated`, `text-primary`, `text-secondary`, `border`, `accent`: the same vocabulary the structure scaffolds already use. Text and accent steps are picked by **measured contrast** — every semantic text/surface pair clears WCAG AA *by construction*.
 
 | Param | Type | Description |
@@ -433,7 +433,7 @@ One seed color → a full perceptual color system, written to the workspace / pr
 | `seed` | string | The brand color everything derives from (`#RRGGBB`) |
 | `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
 
-The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. The status colors get a second pass here too: the light-tuned `success`/`warning`/`danger` are re-lit (hue held) until each clears AA against the dark surface, so a `$danger` message reads in both themes. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
+The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. The status colors get a second pass here too: the light-tuned `success`/`warning`/`danger` are re-lit (hue held) until each clears AA against `bg-elevated` (the lightest dark surface — the stricter target), so a `$danger` message reads in both themes. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
 
 ### `get_variables` / `set_variables`
 
@@ -1178,9 +1178,10 @@ The loop framesmith is built around — start from taste, adapt, and polish to t
 4. **`apply_structure`** → stamp a vetted page pattern, then adapt it with `batch_design` (real icons, controls, and components — not faked from frames). This is the starting point; a blank canvas is the slow, sloppy path.
 5. Watch the viewer auto-refresh as you design; `screenshot` to check the render.
 6. **`canvas_evaluate`** → read the `directive`. Resolve every warning and cliché tell (`canvas_autofix` for the mechanical subset, `batch_design` for the rest), then re-evaluate. Repeat until it says `READY` — only then present the design.
-7. `screenshot_responsive` → confirm it holds at mobile / tablet / desktop.
-8. `canvas_diff` / `canvas_sync_from_url` / `canvas_check_drift` → compare versions, or check the shipped app hasn't drifted from the approved design — pixel-level or structural.
-9. `export` → save final designs to PNG/PDF.
+7. **Final polish, when an LLM API key is configured:** `canvas_evaluate({ mode: "llm" })` scores the render on the fixed five-axis rubric, `canvas_revise` addresses the failing axes, re-judge until it passes. The heuristic gate is the floor; the critique loop is the ceiling — treat it as the standard last step, not an optional extra. No key on hand? The heuristic directive alone decides readiness and the result says so.
+8. `screenshot_responsive` → confirm it holds at mobile / tablet / desktop.
+9. `canvas_diff` / `canvas_sync_from_url` / `canvas_check_drift` → compare versions, or check the shipped app hasn't drifted from the approved design — pixel-level or structural.
+10. `export` → save final designs to PNG/PDF.
 
 ## Development
 

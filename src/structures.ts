@@ -94,9 +94,12 @@ function button(id: string, label: string, fill: string, color: string, stroke?:
     justifyContent: 'center',
     padding: [SPACE.xs, SPACE.lg],
     cornerRadius: RADIUS.sm,
+    minWidth: 0,
+    overflow: 'hidden',
     fill,
     ...(stroke ? { stroke, strokeWidth: 1 } : {}),
-    children: [{ id: `${id}-label`, type: 'text', content: label, fontSize: 16, fontWeight: 600, color }],
+    // Buttons survive hostile-length labels by truncating (designed ellipsis).
+    children: [{ id: `${id}-label`, type: 'text', content: label, fontSize: 16, fontWeight: 600, color, textOverflow: 'ellipsis' }],
   };
 }
 
@@ -129,10 +132,11 @@ function stat(id: string, icon = 'activity'): SceneNode {
       { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, letterSpacing: -0.5, tabularNums: true, textOverflow: 'ellipsis' },
       {
         id: `${id}-delta`, type: 'frame', name: 'Delta', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+        width: '100%', overflow: 'hidden',
         children: [
           { id: `${id}-delta-icon`, type: 'icon', icon: 'trending-up', iconSize: 14, iconColor: '$success' },
-          { id: `${id}-delta-text`, type: 'text', content: 'Change — TBD', fontSize: 12, fontWeight: 600, color: '$success' },
-          { id: `${id}-delta-period`, type: 'text', content: 'vs last period', fontSize: 12, color: COLOR.textSecondary },
+          { id: `${id}-delta-text`, type: 'text', content: 'Change — TBD', fontSize: 12, fontWeight: 600, color: '$success', textOverflow: 'ellipsis' },
+          { id: `${id}-delta-period`, type: 'text', content: 'vs last period', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
         ],
       },
     ],
@@ -173,7 +177,7 @@ function navGroup(id: string, label: string, items: SceneNode[]): SceneNode {
   return {
     id, type: 'frame', name: label, width: '100%', layout: 'vertical', gap: SPACE.xxs,
     children: [
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 12, fontWeight: 600, color: COLOR.textSecondary },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: 12, fontWeight: 600, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
       ...items,
     ],
   };
@@ -191,10 +195,10 @@ function activityRow(id: string, icon: string): SceneNode {
         children: [{ id: `${id}-icon`, type: 'icon', icon, iconSize: 14, iconColor: COLOR.textSecondary }],
       },
       {
-        id: `${id}-copy`, type: 'frame', name: 'Copy', layout: 'vertical',
+        id: `${id}-copy`, type: 'frame', name: 'Copy', layout: 'vertical', minWidth: 0,
         children: [
           { id: `${id}-text`, type: 'text', content: 'Activity item — to confirm', fontSize: 14, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
-          { id: `${id}-time`, type: 'text', content: 'Timestamp — TBD', fontSize: 12, color: COLOR.textSecondary },
+          { id: `${id}-time`, type: 'text', content: 'Timestamp — TBD', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
         ],
       },
     ],
@@ -661,7 +665,7 @@ const dashboard: Structure = {
                       fill: COLOR.accent, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
                       children: [{ id: 'db-brand-icon', type: 'icon', icon: 'zap', iconSize: 16, iconColor: COLOR.bgPrimary }],
                     },
-                    { id: 'db-brand-name', type: 'text', content: 'Brand', fontSize: 16, fontWeight: 700, color: COLOR.textPrimary },
+                    { id: 'db-brand-name', type: 'text', content: 'Brand', fontSize: 16, fontWeight: 700, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
                   ],
                 },
                 navGroup('db-group-main', 'Workspace', [
@@ -678,7 +682,7 @@ const dashboard: Structure = {
             {
               id: 'db-account', type: 'frame', name: 'Account row', width: '100%', layout: 'horizontal',
               alignItems: 'center', gap: SPACE.xs, padding: [SPACE.xs, SPACE.sm],
-              cornerRadius: RADIUS.sm, fill: COLOR.bgElevated,
+              cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, overflow: 'hidden',
               children: [
                 {
                   id: 'db-account-avatar', type: 'frame', name: 'Avatar', width: 28, height: 28, cornerRadius: 999,
@@ -687,9 +691,9 @@ const dashboard: Structure = {
                   children: [{ id: 'db-account-icon', type: 'icon', icon: 'user', iconSize: 14, iconColor: COLOR.textSecondary }],
                 },
                 {
-                  id: 'db-account-copy', type: 'frame', name: 'Identity', layout: 'vertical',
+                  id: 'db-account-copy', type: 'frame', name: 'Identity', layout: 'vertical', minWidth: 0,
                   children: [
-                    { id: 'db-account-name', type: 'text', content: 'Account name — TBD', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+                    { id: 'db-account-name', type: 'text', content: 'Account — TBD', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
                     { id: 'db-account-role', type: 'text', content: 'Workspace — TBD', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
                   ],
                 },
@@ -706,17 +710,17 @@ const dashboard: Structure = {
               id: 'db-topbar', type: 'frame', name: 'Topbar', width: '100%', layout: 'horizontal',
               justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md,
               children: [
-                { id: 'db-title', type: 'text', content: 'Dashboard', fontSize: TYPE.title, color: COLOR.textPrimary },
+                { id: 'db-title', type: 'text', content: 'Dashboard', fontSize: TYPE.title, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
                 {
-                  id: 'db-topbar-actions', type: 'frame', name: 'Actions', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
+                  id: 'db-topbar-actions', type: 'frame', name: 'Actions', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs, minWidth: 0,
                   children: [
                     {
                       id: 'db-search', type: 'frame', name: 'Search', width: 240, height: 36, layout: 'horizontal',
                       alignItems: 'center', gap: SPACE.xs, padding: [SPACE.xs, SPACE.sm], cornerRadius: RADIUS.sm,
-                      fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1,
+                      fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, overflow: 'hidden',
                       children: [
                         { id: 'db-search-icon', type: 'icon', icon: 'search', iconSize: 15, iconColor: COLOR.textSecondary },
-                        { id: 'db-search-text', type: 'text', content: 'Search', fontSize: 14, color: COLOR.textSecondary },
+                        { id: 'db-search-text', type: 'text', content: 'Search', fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
                       ],
                     },
                     {

@@ -512,9 +512,9 @@ The release-dogfood review showed the ceiling: every gate green, and the output 
 - [x] Slice A — `generate_design_system`: seed + personality (technical / editorial / soft / data-dense) → color system + curated font pairing + tracking/leading discipline + radius & density stance + `$elevation.*` shadow tokens (with dark override) + motion defaults
 - [x] Slice B — archetype raise: shell with grouped nav/account row/topbar; stat-card with eyebrow + tabular value + delta chip (+ optional sparkline); data-table with avatar/status-dot cells; charts with labeled axes; settings with sections + footer save bar; `skeleton-stat-card` + un-skeletoned-region coverage warning
 - [x] Slice C — usability: hit-target floor (WCAG 2.5.8), label association, vague action copy; `:focus-visible` rings on controls (viewer-only, screenshots stay deterministic)
-- [ ] Slice D — operating contract + proof: personality/final-polish workflow on the agent surfaces; the same demo pipeline re-run as the before/after release story
+- [x] Slice D — operating contract + proof: personality/final-polish workflow on the agent surfaces; the same demo pipeline re-run as the before/after release story
 
-_Full spec-driven breakdown in [`docs/specs/PHASE-27-SPEC.md`](docs/specs/PHASE-27-SPEC.md)._
+_Full spec-driven breakdown in [`docs/specs/PHASE-27-SPEC.md`](docs/specs/PHASE-27-SPEC.md). All slices shipped — Phase 27 complete: the demo pipeline re-run on the same seed ends with every screen at 98–100, stress CLEAN, the roll-up COHERENT, and screens that read like a product team built them._
 
 ### Issue-driven improvements (post-v1.8)
 

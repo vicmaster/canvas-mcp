@@ -122,14 +122,16 @@ export const STATUS_HUES = { success: 150, warning: 75, danger: 27 } as const;
 const STATUS_L = 0.62;
 const STATUS_C = 0.15;
 
-export function statusColors(): Record<keyof typeof STATUS_HUES, string> {
+export function statusColors(bgHex = '#FFFFFF'): Record<keyof typeof STATUS_HUES, string> {
   // Status colors are used AS TEXT (validation messages, deltas) — each is
-  // darkened from the band until it clears AA against white (dogfood fix:
-  // the raw band's danger sat at 3.9:1). Hue and chroma held.
+  // darkened from the band until it clears AA against the LIGHT PAGE surface
+  // it actually sits on (second dogfood fix: tuning against pure white left
+  // danger at 4.29:1 on the off-white bg-primary; the off-white is the
+  // harder target, so passing there implies passing on white). Hue held.
+  const bg = rgbOf(bgHex);
   const forText = (h: number): string => {
     let o: Oklch = { l: STATUS_L, c: STATUS_C, h };
-    const white: [number, number, number] = [255, 255, 255];
-    for (let i = 0; i < 30 && contrastRatio(rgbOf(oklchToHex(o)), white) < 4.5; i++) {
+    for (let i = 0; i < 30 && contrastRatio(rgbOf(oklchToHex(o)), bg) < 4.5; i++) {
       o = { ...o, l: Math.max(0.2, o.l - 0.02) };
     }
     return oklchToHex(o);
@@ -222,10 +224,15 @@ export function generateColorSystem(seedHex: string): {
 } {
   const primary = generateRamp(seedHex);
   const neutral = matchedNeutral(seedHex);
-  const status = statusColors();
+  // Tune status text against the actual light page surface (neutral-50 =
+  // bg-primary), not pure white — the off-white is the stricter target.
+  const status = statusColors(neutral['50']);
   const { light, dark } = semanticMapping(primary, neutral);
+  // Re-lit against the LIGHTEST dark surface (bg-elevated) — light text
+  // contrasts least there, so passing on it implies surface + primary too
+  // (third dogfood fix: surface-tuned danger sat at 3.96:1 on elevated).
   const darkStatus = Object.fromEntries(
-    Object.entries(status).map(([k, hex]) => [k, raiseForContrast(hex, dark['bg-surface'])]),
+    Object.entries(status).map(([k, hex]) => [k, raiseForContrast(hex, dark['bg-elevated'] ?? dark['bg-surface'])]),
   ) as StatusColors;
   return { seed: { hex: seedHex, oklch: hexToOklch(seedHex) }, primary, neutral, status, light, dark: { ...dark, ...darkStatus } };
 }
