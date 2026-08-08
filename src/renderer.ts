@@ -621,6 +621,11 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
   }
   if (node.opacity !== undefined) s.push(`opacity: ${node.opacity}`);
   if (node.overflow) s.push(`overflow: ${node.overflow}`);
+  if (node.textOverflow === 'ellipsis') {
+    // min-width 0 lets flex rows shrink the text below content size so the
+    // ellipsis actually engages; max-width caps it in stretch-less columns.
+    s.push('white-space: nowrap', 'overflow: hidden', 'text-overflow: ellipsis', 'min-width: 0', 'max-width: 100%');
+  }
   const shadowCss = boxShadowCss(node.shadows, node.shadow);
   if (shadowCss) s.push(`box-shadow: ${shadowCss}`);
   if (node.blur) s.push(`filter: blur(${node.blur}px)`);

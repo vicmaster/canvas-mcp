@@ -988,6 +988,9 @@ interface ClicheCtx {
   rawById: Map<string, SceneNode>; // raw node lookup (literal vs $token)
   tokens: DesignVariables;
   relaxed: Set<ClicheTell>;
+  /** Phase 26 dogfood fix — descendants of detected tables: header cells are
+   * small uppercase labels by convention, NOT section eyebrows. */
+  tableDescendantIds?: Set<string>;
 }
 
 // FR-2 / C4 — default purple/indigo accent. Flags accent usage (stroke, small-
@@ -1269,7 +1272,7 @@ function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
   };
   const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= 28;
 
-  const eyebrowCount = ctx.entries.filter((e) => isEyebrowText(e.node)).length;
+  const eyebrowCount = ctx.entries.filter((e) => isEyebrowText(e.node) && !ctx.tableDescendantIds?.has(e.node.id)).length;
   const sectionCount = ctx.entries.filter((e) => isHeading(e.node)).length;
   if (sectionCount < 2) return [];                      // too small to have a rhythm
 
@@ -1393,7 +1396,11 @@ function tellPureBlackWhite(ctx: ClicheCtx): EvaluationIssue[] {
       });
     }
     // Pure-black / pure-white BACKGROUND surface — suggest-only (deliberate?).
-    if (isBackgroundSurface(node)) {
+    // A fill referenced through a $token is a design-system decision by
+    // construction (the accent-hue precedent) — only literal hex flags.
+    const rawFill = ctx.rawById.get(node.id)?.fill;
+    const viaToken = typeof rawFill === 'string' && rawFill.startsWith('$');
+    if (isBackgroundSurface(node) && !viaToken) {
       const fillHex = isOpaque(node.fill) ? exactHex(node.fill) : null;
       if (fillHex === '#000000') {
         issues.push({
@@ -1461,10 +1468,10 @@ function checkCliche(
   entries: NodeEntry[],
   rawEntries: NodeEntry[],
   tokens: DesignVariables,
-  opts: { relaxed: Set<ClicheTell> },
+  opts: { relaxed: Set<ClicheTell>; tableDescendantIds?: Set<string> },
 ): CheckResult {
   const rawById = new Map(rawEntries.map((e) => [e.node.id, e.node]));
-  const ctx: ClicheCtx = { entries, rawById, tokens, relaxed: opts.relaxed };
+  const ctx: ClicheCtx = { entries, rawById, tokens, relaxed: opts.relaxed, tableDescendantIds: opts.tableDescendantIds };
 
   const issues = [
     ...tellAccentHue(ctx),
@@ -1604,11 +1611,22 @@ export async function evaluateCanvas(
   const rawEntries = buildTreeContext(canvas.root);
 
   if (entries.length <= 1) {
+    // A blank document is not a presentable design. This used to return 100
+    // with the emptiness only mentioned in the summary — so a canvas whose
+    // content never landed (or was wiped) sailed through every gate and the
+    // project roll-up called it coherent (release-dogfood finding: a blank
+    // screen was presented at score 100). Score 0 + a blocking error make
+    // emptiness impossible to mistake for perfection.
     return {
-      overallScore: 100,
-      categories: [],
-      issues: [],
-      summary: 'Canvas is empty — nothing to evaluate.',
+      overallScore: 0,
+      categories: [{ name: 'structure', score: 0, issueCount: 1, weight: 100 }],
+      issues: [{
+        category: 'structure',
+        severity: 'error',
+        nodeId: canvas.root.id,
+        message: 'The canvas is empty — nothing has been designed yet. Stamp a structure (list_structures → apply_structure) or add content before evaluating.',
+      }],
+      summary: 'Canvas is empty — nothing has been designed yet.',
       stats: { totalNodes: entries.length, textNodes: 0, frameNodes: 0, maxDepth: 0, tokenUsagePercent: 0, componentReusePercent: 0 },
       mode: options.mode,
     };
@@ -1674,7 +1692,21 @@ export async function evaluateCanvas(
     const relaxed = new Set(RELAXED_BY_GENRE[genre ?? ''] ?? []);
     // Resolved entries → $accent becomes a real hex for hue math; rawEntries →
     // distinguish a literal default purple (autofixable) from a $token one.
-    results.set('cliche', checkCliche(entries, rawEntries, mergedTokens, { relaxed }));
+    // Table header cells are small uppercase labels by convention — exclude
+    // their subtrees from the eyebrow census (a skeleton-table's 4 headers
+    // are not 4 section eyebrows).
+    const tableDescendantIds = new Set<string>();
+    for (const t of extractInventory(resolvedRoot).tables) {
+      const container = entries.find((en) => en.node.id === t.nodeId)?.node;
+      // Only horizontal row frames — a stack of vertical sections can satisfy
+      // the loose table shape, and its labels ARE eyebrows.
+      for (const row of container?.children ?? []) {
+        if (row.type === 'frame' && row.layout === 'horizontal') {
+          (function walk(n: SceneNode) { tableDescendantIds.add(n.id); n.children?.forEach(walk); })(row);
+        }
+      }
+    }
+    results.set('cliche', checkCliche(entries, rawEntries, mergedTokens, { relaxed, tableDescendantIds }));
     genreReport = buildGenreReport(genre, options.genre !== undefined, relaxed);
   }
 

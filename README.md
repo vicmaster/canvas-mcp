@@ -274,7 +274,7 @@ R("nodeId", { type: "text", content: "Replaced" })
 
 **Node types:** `frame`, `text`, `rectangle`, `ellipse`, `image`, `icon`, `path`, `component`, `instance`, `toggle`, `checkbox`, `radio`, `select`, `chart`, `skeleton` (loading-placeholder block — token-derived neutral fill; pulses subtly in the live viewer, always static in screenshots/exports so diffs stay deterministic; `pulse: false` opts a block out)
 
-**Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"` | `"grid"`), `gap`, `rowGap`, `gridColumns`, `gridColumn`, `gridRow`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `tabularNums`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow`, `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition` (object, or `"$motion.<name>"` referencing a motion token), `kind`, `series`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
+**Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"` | `"grid"`), `gap`, `rowGap`, `gridColumns`, `gridColumn`, `gridRow`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `textOverflow` (`"ellipsis"` — designed single-line truncation; `canvas_stress` reports clips behind it as info), `tabularNums`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow`, `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition` (object, or `"$motion.<name>"` referencing a motion token), `kind`, `series`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
 
 Use `textTransform: "uppercase"` for uppercase labels (don't bake casing into `content`), `letterSpacing` for tracking, and `fontVariationSettings` (e.g. `'"wght" 650'`) for variable-font axes.
 
@@ -406,7 +406,7 @@ One seed color → a full perceptual color system, written to the workspace / pr
 
 - **`primary-50` … `primary-900`** — an OKLCH ramp with perceptually even lightness steps and chroma tapered at the extremes; out-of-gamut colors clip toward lower chroma, never hue-shift. (The hand-rolled conversions are validated against Chrome's own `oklch()` parsing.)
 - **`neutral-50` … `neutral-900`** — a matched neutral carrying a whisper of the seed's hue: never dead grey, never visibly tinted.
-- **`success` / `warning` / `danger`** — status colors at one consistent lightness band.
+- **`success` / `warning` / `danger`** — status colors, hue held, each darkened from the shared band until it clears WCAG AA (4.5:1) **as text on white** — the invariant is shared contrast, not shared lightness (a raw shared-lightness danger red can read under 4:1).
 - **Semantic tokens** — `bg-primary`, `bg-surface`, `bg-elevated`, `text-primary`, `text-secondary`, `border`, `accent`: the same vocabulary the structure scaffolds already use. Text and accent steps are picked by **measured contrast** — every semantic text/surface pair clears WCAG AA *by construction*.
 
 | Param | Type | Description |
@@ -414,7 +414,7 @@ One seed color → a full perceptual color system, written to the workspace / pr
 | `seed` | string | The brand color everything derives from (`#RRGGBB`) |
 | `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
 
-The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
+The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. The status colors get a second pass here too: the light-tuned `success`/`warning`/`danger` are re-lit (hue held) until each clears AA against the dark surface, so a `$danger` message reads in both themes. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
 
 ### `get_variables` / `set_variables`
 
@@ -856,7 +856,7 @@ Content stress test — does the design survive real data? Re-renders the canvas
 | `empty` | Detected tables lose their data rows |
 | `many` | Data rows ×3 |
 
-Finding kinds: `clip` (content cut off — *info* when a designed `text-overflow: ellipsis` is doing its job, *warning* otherwise), `overflow-x` (a node escapes its parent box or the canvas), `layout-shift` (an **untouched** node ballooning — perturbed nodes and their ancestors legitimately grow and are exempt). Only **new** breakage counts: anything already clipping at baseline is the design's standing state. Tables are found with the same inventory drift and coverage use; component instances are expanded first.
+Finding kinds: `clip` (content cut off — *info* when a designed `text-overflow: ellipsis` is doing its job, or when it's just the page growing taller than a fixed artboard — that scrolls on a real page; *warning* otherwise), `overflow-x` (a node escapes its parent box or the canvas), `layout-shift` (an **untouched** node ballooning — perturbed nodes, their ancestors, and a stretch sibling that merely follows a legitimately growing parent are exempt). Only **new** breakage counts: anything already clipping at baseline is the design's standing state. Tables are found with the same inventory drift and coverage use; component instances are expanded first.
 
 | Param | Type | Description |
 |-------|------|-------------|

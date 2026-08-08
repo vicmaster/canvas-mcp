@@ -90,7 +90,7 @@ function stat(id: string, icon = 'activity'): SceneNode {
     strokeWidth: 1,
     children: [
       { id: `${id}-icon`, type: 'icon', icon, iconSize: 24, iconColor: COLOR.accent },
-      { id: `${id}-value`, type: 'text', content: 'Metric — to confirm', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center' },
+      { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', textOverflow: 'ellipsis' },
       { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 14, color: COLOR.textSecondary, textAlign: 'center' },
     ],
   };
@@ -111,7 +111,7 @@ function navItem(id: string, label: string, icon = 'circle'): SceneNode {
     fill: COLOR.bgElevated,
     children: [
       { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: COLOR.textSecondary },
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, color: COLOR.textSecondary },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
     ],
   };
 }
@@ -923,17 +923,20 @@ const emptyState: Structure = {
   description: 'A designed empty state: icon, title, one-line hint, primary action. Stamp it where the data would be — an empty screen is a first-run experience, never a bare void.',
   nodes: [{
     id: 'es', type: 'frame', name: 'Empty state', width: '100%', layout: 'vertical', alignItems: 'center',
-    gap: 6, padding: [48, 24],
+    gap: 8, padding: [48, 24],
     children: [
       { id: 'es-icon', type: 'icon', icon: 'inbox', iconSize: 28, iconColor: COLOR.textSecondary },
       { id: 'es-title', type: 'text', content: 'Nothing here yet', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
-      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 13, color: COLOR.textSecondary },
+      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 12, color: COLOR.textSecondary },
       {
         id: 'es-cta', type: 'frame', name: 'CTA', layout: 'horizontal', alignItems: 'center', gap: 8,
-        padding: [10, 16], cornerRadius: 8, fill: COLOR.accent, width: 'fit-content',
+        padding: [8, 16], cornerRadius: 8, fill: COLOR.accent, width: 'fit-content',
         children: [
-          { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: '#FFFFFF' },
-          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 13, fontWeight: 600, color: '#FFFFFF' },
+          // bg-primary as on-accent text is theme-adaptive: near-white on the
+          // dark accent in light mode, near-black on the light accent in dark
+          // mode (the tier() CTA convention — a literal white breaks in dark).
+          { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: COLOR.bgPrimary },
+          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 14, fontWeight: 600, color: COLOR.bgPrimary },
         ],
       },
     ],
@@ -948,7 +951,7 @@ function skeletonRow(id: string): SceneNode {
   });
   return {
     id, type: 'frame', name: 'Skeleton row', width: '100%', layout: 'horizontal', alignItems: 'center',
-    padding: [14, 16], gap: 16, borderTop: { width: 1, color: COLOR.border },
+    padding: [12, 16], gap: 16, borderTop: { width: 1, color: COLOR.border },
     children: [
       {
         id: `${id}-identity`, type: 'frame', width: '40%', layout: 'horizontal', alignItems: 'center', gap: 8,

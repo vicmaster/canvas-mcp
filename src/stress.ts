@@ -190,13 +190,19 @@ export function compareLayouts(
       const vertical = r.scrollHeight !== undefined && r.clientHeight !== undefined && r.scrollHeight > r.clientHeight + 1;
       const scroll = vertical ? r.scrollHeight : r.scrollWidth;
       const box = vertical ? r.clientHeight : r.clientWidth;
+      // The page outgrowing its fixed artboard vertically is scrolling, not
+      // breakage — every dashboard on a fixed-height artboard would otherwise
+      // fail `many` by construction. Horizontal root clip stays a warning.
+      const rootGrowsTaller = vertical && !r.parentId;
       findings.push({
         kind: 'clip',
-        severity: r.ellipsis ? 'info' : 'warning',
+        severity: r.ellipsis || rootGrowsTaller ? 'info' : 'warning',
         nodeId: id,
         detail: r.ellipsis
           ? `Content truncates with its designed ellipsis under this content (${vertical ? 'height' : 'width'} ${scroll}px vs box ${box}px).`
-          : `Content is cut off (${vertical ? 'height' : 'width'} ${scroll}px vs box ${box}px) with no designed truncation.`,
+          : rootGrowsTaller
+            ? `The page grows taller than the fixed artboard (${scroll}px vs ${box}px) — a real page scrolls here; raise the artboard height if you want the full content reviewable.`
+            : `Content is cut off (${vertical ? 'height' : 'width'} ${scroll}px vs box ${box}px) with no designed truncation.`,
       });
       continue;
     }
@@ -222,12 +228,22 @@ export function compareLayouts(
 
     // layout-shift — an untouched node ballooning is collateral damage.
     if (b && b.height >= 8 && r.height > b.height * 2 && !exempt.has(id)) {
-      findings.push({
-        kind: 'layout-shift',
-        severity: 'warning',
-        nodeId: id,
-        detail: `Node height grew ${b.height}px → ${r.height}px under content it doesn't contain — check wrapping/min-height.`,
-      });
+      // A stretch-sibling is not ballooning: when its parent legitimately grew
+      // (ancestor of a touched node) and this node's height merely followed
+      // that growth with no width change, it is align-stretch doing its job —
+      // the full-height sidebar next to a growing content column.
+      const parentGrowth = parent && bParent ? parent.height - bParent.height : 0;
+      const stretchFollow = parent !== undefined && exempt.has(parent.nodeId)
+        && Math.abs(r.width - b.width) <= TOLERANCE
+        && r.height - b.height <= parentGrowth + TOLERANCE;
+      if (!stretchFollow) {
+        findings.push({
+          kind: 'layout-shift',
+          severity: 'warning',
+          nodeId: id,
+          detail: `Node height grew ${b.height}px → ${r.height}px under content it doesn't contain — check wrapping/min-height.`,
+        });
+      }
     }
   }
 
