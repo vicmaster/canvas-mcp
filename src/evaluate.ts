@@ -1611,11 +1611,22 @@ export async function evaluateCanvas(
   const rawEntries = buildTreeContext(canvas.root);
 
   if (entries.length <= 1) {
+    // A blank document is not a presentable design. This used to return 100
+    // with the emptiness only mentioned in the summary — so a canvas whose
+    // content never landed (or was wiped) sailed through every gate and the
+    // project roll-up called it coherent (release-dogfood finding: a blank
+    // screen was presented at score 100). Score 0 + a blocking error make
+    // emptiness impossible to mistake for perfection.
     return {
-      overallScore: 100,
-      categories: [],
-      issues: [],
-      summary: 'Canvas is empty — nothing to evaluate.',
+      overallScore: 0,
+      categories: [{ name: 'structure', score: 0, issueCount: 1, weight: 100 }],
+      issues: [{
+        category: 'structure',
+        severity: 'error',
+        nodeId: canvas.root.id,
+        message: 'The canvas is empty — nothing has been designed yet. Stamp a structure (list_structures → apply_structure) or add content before evaluating.',
+      }],
+      summary: 'Canvas is empty — nothing has been designed yet.',
       stats: { totalNodes: entries.length, textNodes: 0, frameNodes: 0, maxDepth: 0, tokenUsagePercent: 0, componentReusePercent: 0 },
       mode: options.mode,
     };

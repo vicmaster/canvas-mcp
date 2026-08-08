@@ -160,7 +160,9 @@ async function testEmptyCanvas() {
 
   const canvas = createCanvas('Empty');
   const result = await evaluateCanvas(canvas, { mode: 'fast' });
-  assert(result.overallScore === 100, `Empty canvas scores 100`);
+  // The old contract (score 100, emptiness only in the summary) let a blank
+  // canvas sail through every gate — release-dogfood finding.
+  assert(result.overallScore === 0, `Empty canvas scores 0 (got ${result.overallScore})`);
   assert(result.summary.includes('empty'), `Summary mentions empty`);
 }
 
@@ -172,6 +174,15 @@ async function main() {
   await testDetailedMode();
   await testCategoryFilter();
   await testEmptyCanvas();
+
+  // Empty canvas — a blank document must not score as presentable.
+  {
+    const empty = createCanvas('Blank');
+    const r = await evaluateCanvas(empty, { mode: 'fast' });
+    const structErr = r.issues.find((i) => i.category === 'structure' && i.severity === 'error' && i.message.includes('empty'));
+    assert(structErr !== undefined, 'empty canvas gets a blocking structure error');
+    assert(r.overallScore < 90, `empty canvas cannot score high (got ${r.overallScore})`);
+  }
 
   console.log(`\n===========================`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
