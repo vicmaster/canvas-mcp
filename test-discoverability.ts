@@ -245,6 +245,14 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── Phase 28 slice A: the color range ────────────────────────────────────────
+{
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    expect(`chart tokens in ${surface[0]}`, surface[1].includes('chart-1'));
+    expect(`tint layer in ${surface[0]}`, surface[1].includes('success-tint') && surface[1].includes('accent-tint'));
+  }
+}
+
 // ── Phase 27 slice C: the usability category ─────────────────────────────────
 {
   for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
