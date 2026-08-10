@@ -8,7 +8,17 @@ An open-source MCP server that turns your AI coding agent into a capable UI desi
 
 ![framesmith viewer — workspace sidebar on the left, and the Pattern library project on the right showing the 11 vetted page patterns (auth, bento-grid, catalogue, dashboard, editorial-longform, marquee-hero, onboarding, pricing, settings, split-workbench, stat-led) as live thumbnails on a generated design system, each with a green quality-score badge, and state chips (default / loading / empty / error) under every data-bearing pattern.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-dashboard.png?v=2.0)
 
-> Above: the framesmith viewer, showing the built-in **pattern library** — 11 vetted page archetypes an agent starts from, each carrying its live quality score (all 100 here). Workspaces and projects sit in the sidebar; you browse canvases like design files.
+> Above: the framesmith viewer, showing the built-in **pattern library** — 11 vetted page archetypes an agent starts from, each carrying its live quality score and its designed state variants. Workspaces and projects sit in the sidebar; you browse canvases like design files.
+
+### What an agent actually ships
+
+Both screens below were built end-to-end by an agent with framesmith's own vocabulary — one `generate_design_system` call each (a seed color + a personality), stamped patterns, data-bound charts, and every quality gate cleared (score ≥ 95, states designed, stress-tested, both themes):
+
+![A field-operations dashboard built by an agent in framesmith, light theme: sidebar with grouped navigation and an account row, four KPI cards with sparklines and tinted delta pills, a bar chart with a highlighted day and a floating tooltip, a data-bound coverage donut with a center total and legend, a recent-activity table with tinted status chips, and a ranked top-agents panel. Generated from one seed (#2563EB) on the "technical" personality.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-ops-dashboard.png?v=2.0)
+
+![An API platform console built by the same toolkit, dark theme: teal design system on the "data-dense" personality with JetBrains Mono figures — request/error-rate/latency KPI cards with sparklines, a requests-per-day bar chart with a highlighted day, a traffic-by-endpoint donut, a deployments table with Live/Rolling/Degraded status chips, and a top-consumers panel.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-api-console.png?v=2.0)
+
+> Same machinery, different seed + personality: a light ops dashboard and a dark API console. Every color pair is AA by construction, every chart is data-bound (edit a value, not an SVG path), and the dark theme is generated — not inverted.
 
 ```
 MCP Client → stdio → framesmith server
