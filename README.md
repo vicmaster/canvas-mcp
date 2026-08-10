@@ -6,9 +6,19 @@ An open-source MCP server that turns your AI coding agent into a capable UI desi
 
 **Contents:** [What it does](#what-framesmith-does) · [Capabilities](#capabilities-at-a-glance) · [Viewer](#viewer) · [Installation](#installation) · [Tools](#tools) · [Usage Example](#usage-example) · [Workflow](#workflow) · [Development](#development)
 
-![framesmith viewer — workspace sidebar on the left, and the Pattern library project on the right showing 11 vetted page patterns (auth, bento-grid, catalogue, dashboard, editorial-longform, marquee-hero, onboarding, pricing, settings, split-workbench, stat-led) as live thumbnails, each with a green 100 quality-score badge.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-dashboard.png?v=1.9)
+![framesmith viewer — workspace sidebar on the left, and the Pattern library project on the right showing the 11 vetted page patterns (auth, bento-grid, catalogue, dashboard, editorial-longform, marquee-hero, onboarding, pricing, settings, split-workbench, stat-led) as live thumbnails on a generated design system, each with a green quality-score badge, and state chips (default / loading / empty / error) under every data-bearing pattern.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-dashboard.png?v=2.0)
 
-> Above: the framesmith viewer, showing the built-in **pattern library** — 11 vetted page archetypes an agent starts from, each carrying its live quality score (all 100 here). Workspaces and projects sit in the sidebar; you browse canvases like design files.
+> Above: the framesmith viewer, showing the built-in **pattern library** — 11 vetted page archetypes an agent starts from, each carrying its live quality score and its designed state variants. Workspaces and projects sit in the sidebar; you browse canvases like design files.
+
+### What an agent actually ships
+
+Both screens below were built end-to-end by an agent with framesmith's own vocabulary — one `generate_design_system` call each (a seed color + a personality), stamped patterns, data-bound charts, and every quality gate cleared (score ≥ 95, states designed, stress-tested, both themes):
+
+![A customer-support dashboard built by an agent in framesmith, light theme: sidebar with grouped navigation and an account row, four KPI cards (tickets resolved, first reply, SLA breaches, CSAT) with sparklines and tinted delta pills, a tickets-per-day bar chart with a highlighted day and a floating tooltip, a data-bound tickets-by-channel donut with a center total and legend, an agent-workload table with tinted status chips, and a top-performers panel. Generated from one seed (#2563EB) on the "technical" personality.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-support-dashboard.png?v=2.0)
+
+![An API platform console built by the same toolkit, dark theme: teal design system on the "data-dense" personality with JetBrains Mono figures — request/error-rate/latency KPI cards with sparklines, a requests-per-day bar chart with a highlighted day, a traffic-by-endpoint donut, a deployments table with Live/Rolling/Degraded status chips, and a top-consumers panel.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-api-console.png?v=2.0)
+
+> Same machinery, different seed + personality: a light ops dashboard and a dark API console. Every color pair is AA by construction, every chart is data-bound (edit a value, not an SVG path), and the dark theme is generated — not inverted.
 
 ```
 MCP Client → stdio → framesmith server
@@ -46,7 +56,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 
 Run `npx -p framesmith framesmith-viewer` to start the standalone browser viewer (default port 3001). Open any canvas to review it at multiple breakpoints, compare them side-by-side, inspect the underlying JSON, or archive / delete.
 
-![framesmith canvas detail view — the dashboard pattern rendered (icon nav sidebar, three stat cards with icons, a real multi-series line chart with an area fill and a dashed reference line beside a recent-activity panel) with the Quality inspector open on the right: a 100/100 "Excellent" score, per-category bars all at 100 (spacing, color, typography, structure, consistency, cliche), and one advisory issue. The inspector's tab row shows Quality, Design system, Feedback, and Import; the toolbar includes a Comment toggle.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-canvas.png?v=1.9)
+![framesmith canvas detail view — the dashboard pattern rendered (grouped sidebar navigation with an account row, KPI cards with sparklines and delta pills, a real multi-series line chart with an area fill and a dashed reference line beside a recent-activity feed) with the Quality inspector open on the right: a 99/100 "Excellent" score, per-category bars (spacing, color, typography, structure, consistency, usability, coverage, cliche), and honest APCA advisories in the issue list. The toolbar shows the canvas's designed states (default / loading / empty), theme and viewport toggles, and a Comment toggle.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-canvas.png?v=2.0)
 
 > Above: a canvas in the detail view with the **Quality inspector** on the right — the same `canvas_evaluate` score the agent sees, with per-category bars and the issue list; the tabs along the top switch to the **Design-system** and **Feedback** panels. The toolbar exposes breakpoint previews, Compare, Fit, JSON, a **Comment** toggle for point-and-tell feedback, and lifecycle actions.
 
