@@ -82,6 +82,18 @@ check('structural: words survive', !isDataLike('STATUS') && !isDataLike('Rename'
     frame([text('REVENUE'), text('Details')]),
     frame([text('GROWTH'), text('Details')]),
   ], { layout: 'grid' } as never)]));
+  // Phase 28 — two stacked horizontal rows (topbar over greeting) is a
+  // layout, never a table; three matching rows still are; an import-named
+  // Table keeps the trusted two-row shape.
+  const layoutInv = extractInventory(doc([frame([
+    frame([frame([text('Fieldwork')]), frame([text('Search')])], { layout: 'horizontal' }),
+    frame([frame([text('Good morning')]), frame([text('Export')])], { layout: 'horizontal' }),
+  ])]));
+  check('two stacked 2-cell rows never read as a table', layoutInv.tables.length === 0, JSON.stringify(layoutInv.tables));
+  const threeRowInv = extractInventory(doc([table(['NAME', 'TYPE'], [['a', 'b'], ['c', 'd']])]));
+  check('header + two data rows (3 total) still detected', threeRowInv.tables.length === 1);
+  const namedTwoRow = extractInventory(doc([table(['NAME', 'TYPE'], [['a', 'b']], 'Table')]));
+  check('import-named Table keeps the loose 2-row shape', namedTwoRow.tables.length === 1, JSON.stringify(namedTwoRow.tables));
   check('grid container never reads as a table', inv.tables.length === 0);
 }
 

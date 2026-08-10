@@ -522,7 +522,7 @@ The reference-caliber attempt (2026-08-10) proved today's toolkit reaches a top-
 
 - [x] Slice A — the color range: `$chart-1`…`$chart-6` categorical tokens (hue-walked from the seed, ≥ 3:1 on both themes' surfaces) + the `-tint` layer (`accent-tint` / `success-tint` / … paired with their text-tuned inks, AA both themes)
 - [x] Slice B — dataviz primitives: donut chart kind (data-bound segments + center value slot), bar `highlight` + in-SVG gradients, sparkline kind
-- [ ] Slice C — evaluator vocabulary: token-ref exemptions for `$chart-*`/`$*-tint` on the accent-hue and gradient tells, aspect-ratio guard on fake-chrome, the KPI stat-signature exemption on the eyebrow census, `detectTable` three-row minimum
+- [x] Slice C — evaluator vocabulary: token-ref exemptions for `$chart-*`/`$*-tint` on the accent-hue and gradient tells, aspect-ratio guard on fake-chrome, the KPI stat-signature exemption on the eyebrow census, `detectTable` three-row minimum
 - [ ] Slice D — micro-pattern scaffolds (`kpi-card`, `status-chip`, `segmented-control`, `breadcrumb`, `initials-avatar`) + the zero-dodge attempt re-run as proof
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-28-SPEC.md`](docs/specs/PHASE-28-SPEC.md)._
