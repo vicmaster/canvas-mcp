@@ -523,9 +523,9 @@ The reference-caliber attempt (2026-08-10) proved today's toolkit reaches a top-
 - [x] Slice A — the color range: `$chart-1`…`$chart-6` categorical tokens (hue-walked from the seed, ≥ 3:1 on both themes' surfaces) + the `-tint` layer (`accent-tint` / `success-tint` / … paired with their text-tuned inks, AA both themes)
 - [x] Slice B — dataviz primitives: donut chart kind (data-bound segments + center value slot), bar `highlight` + in-SVG gradients, sparkline kind
 - [x] Slice C — evaluator vocabulary: token-ref exemptions for `$chart-*`/`$*-tint` on the accent-hue and gradient tells, aspect-ratio guard on fake-chrome, the KPI stat-signature exemption on the eyebrow census, `detectTable` three-row minimum
-- [ ] Slice D — micro-pattern scaffolds (`kpi-card`, `status-chip`, `segmented-control`, `breadcrumb`, `initials-avatar`) + the zero-dodge attempt re-run as proof
+- [x] Slice D — micro-pattern scaffolds (`kpi-card`, `status-chip`, `segmented-control`, `breadcrumb`, `initials-avatar`) + the zero-dodge attempt re-run as proof
 
-_Full spec-driven breakdown in [`docs/specs/PHASE-28-SPEC.md`](docs/specs/PHASE-28-SPEC.md)._
+_Full spec-driven breakdown in [`docs/specs/PHASE-28-SPEC.md`](docs/specs/PHASE-28-SPEC.md). All slices shipped — Phase 28 complete: the reference attempt re-ran with every workaround deleted at score 95 in BOTH themes (the first attempt had no dark story at all), and the diff between the two attempt scripts is the phase's changelog._
 
 ### Issue-driven improvements (post-v1.8)
 

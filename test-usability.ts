@@ -128,7 +128,7 @@ I("document", { type: "text", content: "Click here to continue reading the guide
 // ── the library ships what it preaches ──────────────────────────────────────
 {
   console.log('── archetypes are clean ──');
-  for (const name of ['settings', 'dashboard', 'auth', 'toggle-row', 'form-field', 'data-table']) {
+  for (const name of ['settings', 'dashboard', 'auth', 'toggle-row', 'form-field', 'data-table', 'kpi-card', 'status-chip', 'segmented-control', 'breadcrumb', 'initials-avatar']) {
     const c = createCanvas(`arch-${name}`);
     const s = applyStructure(c, name, { replace: true, targetId: name === 'toggle-row' || name === 'form-field' || name === 'data-table' ? 'document' : undefined });
     void s;

@@ -43,6 +43,17 @@ async function testColorUtils() {
 // --- FR-2 / C4: default purple accent ---
 
 // --- Phase 28 slice C: the evaluator knows dashboard language ---
+async function testMicroPatternScaffolds() {
+  console.log('\n── Phase 28: micro-pattern scaffolds ──');
+  const { applyStructure } = await import('./src/structures.js');
+  for (const name of ['kpi-card', 'status-chip', 'segmented-control', 'breadcrumb', 'initials-avatar']) {
+    const c = createCanvas(`mp-${name}`);
+    applyStructure(c, name, { targetId: 'document' });
+    const issues = await cliche(c);
+    assert(issues.length === 0, `${name}: zero cliché tells on the seeded defaults`);
+  }
+}
+
 async function testDashboardVocabulary() {
   console.log('\n── Phase 28: dashboard vocabulary ──');
 
@@ -465,6 +476,7 @@ async function main() {
   await testCleanAndCategory();
   await testAutofixSurfacing();
   await testDashboardVocabulary();
+  await testMicroPatternScaffolds();
 
   console.log(`\n${passed} passed, ${failed} failed`);
   await shutdown();
