@@ -245,6 +245,16 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── Phase 28 slice B: dataviz primitives ─────────────────────────────────────
+{
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+    expect(`donut kind in ${surface[0]}`, surface[1].includes('donut'));
+    expect(`sparkline kind in ${surface[0]}`, surface[1].includes('sparkline'));
+    expect(`segments vocabulary in ${surface[0]}`, surface[1].includes('segments'));
+    expect(`bar emphasis vocabulary in ${surface[0]}`, surface[1].includes('highlight'));
+  }
+}
+
 // ── Phase 28 slice A: the color range ────────────────────────────────────────
 {
   for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {

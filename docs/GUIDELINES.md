@@ -94,6 +94,9 @@ The `chart` node owns the value→coordinate math — give it data and domains, 
 - **X positions are data indexes.** A 7-point booked series against a 12-point target series stops at 7/12 of the width automatically; `xDomain`/`yDomain` default from the data (bars floor at 0).
 - **Furniture is opt-in props**: `gridlines: 4`, `xLabels`/`yLabels` (spread evenly; empty strings skip intermediate ticks), `curve: "smooth"`, `kind: "bar"` for grouped bars.
 - **Editing a data point is a one-prop edit** — update the series array, done.
+- **Bar emphasis is a prop, not a rebuild.** `highlight: [11]` on a bar series renders the selected bar solid while the rest go muted (~30%); add `barGradient: true` and the muted bars fade vertically inside the SVG — invisible to the gradient-overuse tell by construction. The floating tooltip card stays your composition (`position: "absolute"` frame with `$elevation.floating`).
+- **Donuts are data-bound.** `kind: "donut"` + `segments: [{ value: 385, color: "$chart-1", label: "North" }, …]` + `innerRatio?` + `centerValue`/`centerLabel` — slices run clockwise from 12 o'clock, the center figure renders tabular and bold. Compose the legend yourself: rows of `$chart-*` dots + labels + values (legend layout is design, not charting). Never fake a ring with conic gradients.
+- **Sparklines are the KPI-card mini-trend.** `kind: "sparkline"` (+ `sparkKind: "bar" | "line"`) — axis-free, tick-free, latest point emphasized by default (`series.highlight` overrides). Never hand-place 4px bars.
 
 ## Anti-patterns
 

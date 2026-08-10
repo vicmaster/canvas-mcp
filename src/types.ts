@@ -24,6 +24,22 @@ export interface ChartSeries {
   area?: boolean;
   /** Dot markers on each data point. Lines only. */
   points?: boolean;
+  /** Phase 28 — bar emphasis: these data indices render solid; the rest render
+   * muted (~30% opacity). The reference-dashboard selected-bar treatment. */
+  highlight?: number[];
+  /** Phase 28 — bars fill with a vertical fade of the series color, rendered
+   * inside the SVG (invisible to the gradient-overuse tell by construction).
+   * Highlighted bars stay solid. Bars only. */
+  barGradient?: boolean;
+}
+
+/** Phase 28 — one slice of a donut chart. */
+export interface ChartSegment {
+  value: number;
+  /** Segment color. `$token` refs resolve — `$chart-1`…`$chart-6` is the vocabulary. */
+  color: string;
+  /** Reserved for the agent-composed legend; not rendered by the chart. */
+  label?: string;
 }
 
 /** Phase 22 slice A — a single border side. `style` defaults to "solid";
@@ -201,7 +217,17 @@ export interface SceneNode {
 
   // Chart (only for type: 'chart'). Sized by width/height like any node;
   // fill/stroke/cornerRadius style the box, series carry the plot colors.
-  kind?: 'line' | 'bar';
+  kind?: 'line' | 'bar' | 'donut' | 'sparkline';
+  /** Donut only — the slices, clockwise from 12 o'clock. */
+  segments?: ChartSegment[];
+  /** Donut only — hole radius as a fraction of the outer radius (default 0.72). */
+  innerRatio?: number;
+  /** Donut only — the big tabular figure rendered in the hole (uses `color`, default near-black). */
+  centerValue?: string;
+  /** Donut only — the muted caption under the center value. */
+  centerLabel?: string;
+  /** Sparkline only — bar (default) or line form. */
+  sparkKind?: 'bar' | 'line';
   series?: ChartSeries[];
   /** Index range plotted on x (default [0, longestSeries - 1]). */
   xDomain?: [number, number];

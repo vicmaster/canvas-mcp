@@ -25,7 +25,7 @@ MCP Client → stdio → framesmith server
 Left to itself, an AI agent tends to produce UI that *looks* AI-generated — generic spacing, no icons, a purple gradient by default, placeholder text that reads like placeholder text. framesmith closes that gap by moving design **before** code and holding it to a bar:
 
 1. **Start from taste, not a blank canvas.** The agent stamps one of **11 vetted page patterns** (dashboard, auth, pricing, settings, onboarding, and more) — each regression-tested to score **> 95 with zero cliché tells** across every theme — then adapts it. A blank canvas is where slop comes from; a pattern is a non-slop starting point. *(`list_structures` / `apply_structure`)*
-2. **Use the whole toolkit — like a real UI does.** Real icons (Lucide + Material Symbols), fonts resolved by name, real input controls (`toggle` / `checkbox` / `radio` / `select`), data-driven charts (line/bar, multi-series), reusable components, and layered design tokens — never faked with Unicode glyphs, stray ellipses, or hand-drawn SVG paths standing in for a chart.
+2. **Use the whole toolkit — like a real UI does.** Real icons (Lucide + Material Symbols), fonts resolved by name, real input controls (`toggle` / `checkbox` / `radio` / `select`), data-driven charts (line/bar/donut/sparkline, multi-series, bar emphasis), reusable components, and layered design tokens — never faked with Unicode glyphs, stray ellipses, or hand-drawn SVG paths standing in for a chart.
 3. **Evaluate, then self-correct.** `canvas_evaluate` scores the design across five craft categories plus a **cliché-tell** detector, a **state-coverage** check (a data screen without designed empty/loading states isn't done), and a **usability** layer (hit-target floor, label association, honest action copy), and returns a **`READY` / `NOT READY` directive**. The agent resolves every warning and tell and only presents once it's `READY` — polishing to the bar is the agent's job, not yours.
 4. **Review in the browser, own the output.** You browse canvases like design files, with a live **quality inspector** and **design-system panel**. Designs persist as **open JSON checked into your repo** — no proprietary format, no lock-in — and can be re-imported from shipped HTML to keep the design honest.
 
@@ -33,7 +33,7 @@ Left to itself, an AI agent tends to produce UI that *looks* AI-generated — ge
 
 | Area | What you get |
 |------|--------------|
-| **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · real CSS grid (`layout: "grid"` + spans) for bento/editorial compositions · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar, multi-series) |
+| **Rendering** | Scene graph → HTML/CSS → Puppeteer PNG · responsive breakpoints · real CSS grid (`layout: "grid"` + spans) for bento/editorial compositions · gradients, shadows, blur, glassmorphism · SVG paths · animations · data-driven charts (line/bar/donut/sparkline, multi-series, bar emphasis + in-SVG gradients) |
 | **Pattern library** | 11 vetted page archetypes + 5 component scaffolds, all scoring > 95 with zero cliché tells; taxonomy axes + a diversification signal so successive screens vary |
 | **Quality & taste** | `canvas_evaluate` (8 categories incl. cliché tells, state coverage + usability floors) with a `READY`/`NOT READY` directive · `canvas_autofix` (mechanical fixes) · optional vision-model rubric critique + `canvas_revise` · `canvas_add_variant` clones a screen into a linked empty/loading/error state · `canvas_stress` content-perturbation testing (long text, i18n, big numbers, empty/many rows) · `project_evaluate` rolls up a project's screens for cross-screen consistency (radius/accent drift, token adoption, hand-copied chrome, state coverage) plus an optional multi-screen flow critique — advisory, never a gate |
 | **Design systems** | `generate_design_system`: one seed + one personality (`technical` / `editorial` / `soft` / `data-dense`) → the complete design language — colors, curated font pairing, typography roles, radius/density stances, `$elevation` depth tokens (dark-aware), `$motion` defaults · layered `$token`s (workspace ▸ project ▸ canvas) · style presets · `DESIGN.md` import · `generate_scale` derives a modular type + spacing scale from a named ratio (optional fluid `clamp()` sizes) · `generate_color_system` turns one seed color into OKLCH ramps + AA-checked semantic tokens, a categorical chart palette, and a tint layer for chips/tiles/badges, dark theme included · dual-theme rendering + evaluation (`theme: "dark"` on screenshot/export, both-theme contrast in `canvas_evaluate` with APCA advisory) · token-detachment lint re-attaches literals that drift from a token |
@@ -274,7 +274,7 @@ R("nodeId", { type: "text", content: "Replaced" })
 
 **Node types:** `frame`, `text`, `rectangle`, `ellipse`, `image`, `icon`, `path`, `component`, `instance`, `toggle`, `checkbox`, `radio`, `select`, `chart`, `skeleton` (loading-placeholder block — token-derived neutral fill; pulses subtly in the live viewer, always static in screenshots/exports so diffs stay deterministic; `pulse: false` opts a block out)
 
-**Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"` | `"grid"`), `gap`, `rowGap`, `gridColumns`, `gridColumn`, `gridRow`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `textOverflow` (`"ellipsis"` — designed single-line truncation; `canvas_stress` reports clips behind it as info), `tabularNums`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow` (CSS string, or `"$elevation.<name>"` referencing an elevation token), `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition` (object, or `"$motion.<name>"` referencing a motion token), `kind`, `series`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
+**Properties:** `fill`, `gradient`, `stroke`, `strokeWidth`, `strokeStyle`, `borderTop`, `borderRight`, `borderBottom`, `borderLeft`, `cornerRadius`, `width`, `height`, `layout` (`"horizontal"` | `"vertical"` | `"grid"`), `gap`, `rowGap`, `gridColumns`, `gridColumn`, `gridRow`, `padding`, `alignItems`, `justifyContent`, `fontSize`, `fontFamily`, `fontWeight`, `color`, `content`, `textAlign`, `lineHeight`, `letterSpacing` (px), `textDecoration`, `textTransform`, `textOverflow` (`"ellipsis"` — designed single-line truncation; `canvas_stress` reports clips behind it as info), `tabularNums`, `fontVariationSettings`, `src`, `objectFit`, `opacity`, `shadow` (CSS string, or `"$elevation.<name>"` referencing an elevation token), `shadows`, `blur`, `backdropBlur`, `backdropFilter`, `overflow`, `wrap`, `position`, `x`, `y`, `icon`, `iconSize`, `iconColor`, `iconStyle`, `checked`, `disabled`, `value`, `d`, `viewBox`, `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `animation`, `transition` (object, or `"$motion.<name>"` referencing a motion token), `kind`, `series`, `segments`, `innerRatio`, `centerValue`, `centerLabel`, `sparkKind`, `xDomain`, `yDomain`, `curve`, `gridlines`, `xLabels`, `yLabels`, `componentId`, `overrides`
 
 Use `textTransform: "uppercase"` for uppercase labels (don't bake casing into `content`), `letterSpacing` for tracking, and `fontVariationSettings` (e.g. `'"wght" 650'`) for variable-font axes.
 
@@ -288,6 +288,19 @@ I(panel, { type: "chart", kind: "line", width: 600, height: 220, curve: "smooth"
   ],
   xLabels: ["Jan", "", "", "", "", "", "", "", "", "", "", "Dec"] })
 ```
+
+Phase 28 adds the dashboard kinds. A **donut** is data-bound segments plus a center figure — the legend stays your composition:
+
+```
+I(panel, { type: "chart", kind: "donut", width: 176, height: 176, centerValue: "1,204", centerLabel: "forms",
+  segments: [
+    { value: 385, color: "$chart-1", label: "North" },
+    { value: 289, color: "$chart-2", label: "Highlands" },
+    { value: 217, color: "$chart-3", label: "River delta" }
+  ] })
+```
+
+A **bar chart with a selected day** is `highlight: [11]` on the series (selected bar solid, the rest muted; `barGradient: true` fades the muted bars inside the SVG, invisible to the gradient-overuse tell). A **sparkline** is `kind: "sparkline"` — axis-free, latest point emphasized by default, sized for a KPI card corner. `segments[].color` and series `stroke` both take `$chart-1`…`$chart-6` refs.
 
 Multi-series in one node; x positions are data indexes (a shorter series stops early against a longer one — booked months vs a full-year target); `xDomain`/`yDomain` default from the data (bars floor at 0); `kind: "bar"` renders grouped bars from the same series model. Dash the projected series, solid the actuals. Editing one value is a one-prop edit — never hand-compute path `d` strings for a chart.
 
