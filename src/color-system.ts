@@ -209,6 +209,94 @@ function raiseForContrast(hex: string, bgHex: string, min = 4.5): string {
   return oklchToHex(o);
 }
 
+// ── Phase 28 slice A — the color range ──────────────────────────────────────
+
+/** The purple band the accent-hue cliché tell polices (kept in sync with
+ * evaluate.ts's isPurpleHue). The categorical walk avoids it UNLESS the seed
+ * itself lives there — a purple brand's palette must not dodge its own hue. */
+const PURPLE_HUE_MIN = 285;   // OKLCH hue, ≈ hsl 230
+const PURPLE_HUE_MAX = 330;   // ≈ hsl 290
+
+export type CategoricalPalette = Record<'chart-1' | 'chart-2' | 'chart-3' | 'chart-4' | 'chart-5' | 'chart-6', string>;
+
+/** Categorical series palette: the seed hue first, then a deterministic hue
+ * walk with fixed perceptual guardrails — lightness band 0.55–0.65, chroma
+ * matched to the seed (floored so near-neutral seeds still yield chromatic
+ * series), ≥ 30° separation, and each color pushed until it clears the 3:1
+ * graphical-object floor (WCAG 1.4.11) against BOTH themes' surfaces. */
+export function categoricalPalette(
+  seedHex: string,
+  surfaces: { light: string; dark: string },
+): { palette: CategoricalPalette; darkPalette: CategoricalPalette; note?: string } {
+  const seed = hexToOklch(seedHex);
+  const nearNeutral = seed.c < 0.03;
+  // A near-neutral seed has no meaningful hue — anchor the walk at a stable
+  // blue instead of amplifying noise, and say so (no silent degradation).
+  const baseHue = nearNeutral ? 250 : seed.h;
+  const seedIsPurple = !nearNeutral && baseHue >= PURPLE_HUE_MIN && baseHue <= PURPLE_HUE_MAX;
+  const chroma = Math.max(0.11, Math.min(0.17, nearNeutral ? 0.13 : seed.c));
+
+  const hues: number[] = [];
+  for (let k = 0; hues.length < 6 && k < 12; k++) {
+    const h = (baseHue + k * 55) % 360;
+    if (!seedIsPurple && h >= PURPLE_HUE_MIN && h <= PURPLE_HUE_MAX) continue;
+    // 55° steps guarantee ≥ 30° separation except across the wrap — check.
+    if (hues.some((prev) => {
+      const d = Math.abs(prev - h);
+      return Math.min(d, 360 - d) < 30;
+    })) continue;
+    hues.push(h);
+  }
+
+  /** Adjust lightness from the band until ≥ 3:1 on `bg` (direction chosen by
+   * the surface: darken for light surfaces, lighten for dark ones). */
+  const settle = (h: number, bg: string, dir: 1 | -1, startL: number): string => {
+    let o: Oklch = { l: startL, c: chroma, h };
+    const bgRgb = rgbOf(bg);
+    for (let i = 0; i < 30 && contrastRatio(rgbOf(oklchToHex(o)), bgRgb) < 3; i++) {
+      o = { ...o, l: Math.max(0.3, Math.min(0.85, o.l + dir * 0.02)) };
+    }
+    return oklchToHex(o);
+  };
+
+  const entries = hues.map((h, i) => [`chart-${i + 1}`, settle(h, surfaces.light, -1, 0.6)]);
+  const darkEntries = hues.map((h, i) => [`chart-${i + 1}`, settle(h, surfaces.dark, 1, 0.66)]);
+  return {
+    palette: Object.fromEntries(entries) as CategoricalPalette,
+    darkPalette: Object.fromEntries(darkEntries) as CategoricalPalette,
+    ...(nearNeutral ? { note: 'Seed is near-neutral — the series palette anchors at a stable blue instead of amplifying the seed hue.' } : {}),
+    ...(hues.length < 6 ? { note: `Only ${hues.length} guaranteed-distinct series hues from this seed.` } : {}),
+  };
+}
+
+export type TintLayer = Record<'accent-tint' | 'success-tint' | 'warning-tint' | 'danger-tint' | 'neutral-tint', string>;
+
+/** The tint layer: soft same-hue surfaces for chips, icon tiles, pills, and
+ * initials avatars, each PAIRED with its existing text-tuned ink (`accent`,
+ * `success`, … — `text-secondary` for neutral). The pair is AA by
+ * construction: the tint backs off toward the surface until its ink clears
+ * 4.5:1 on it. Dark tints are low-lightness washes paired the same way. */
+export function tintLayer(
+  inks: Record<'accent-tint' | 'success-tint' | 'warning-tint' | 'danger-tint' | 'neutral-tint', string>,
+  mode: 'light' | 'dark',
+): TintLayer {
+  const out = {} as TintLayer;
+  for (const [name, ink] of Object.entries(inks) as Array<[keyof TintLayer, string]>) {
+    const hue = hexToOklch(ink).h;
+    let tint: Oklch = mode === 'light'
+      ? { l: 0.93, c: 0.045, h: hue }
+      : { l: 0.3, c: 0.055, h: hue };
+    const inkRgb = rgbOf(ink);
+    // Back the tint off (lighter in light mode, darker in dark) until the
+    // pair reads at AA text contrast.
+    for (let i = 0; i < 20 && contrastRatio(inkRgb, rgbOf(oklchToHex(tint))) < 4.5; i++) {
+      tint = { ...tint, l: mode === 'light' ? Math.min(0.97, tint.l + 0.01) : Math.max(0.2, tint.l - 0.01) };
+    }
+    out[name] = oklchToHex(tint);
+  }
+  return out;
+}
+
 export type StatusColors = Record<'success' | 'warning' | 'danger', string>;
 
 /** The full system from one seed — what generate_color_system writes/reports.
@@ -221,6 +309,14 @@ export function generateColorSystem(seedHex: string): {
   status: StatusColors;
   light: SemanticTheme;
   dark: SemanticTheme & StatusColors;
+  /** Phase 28 — categorical series tokens (chart-1…chart-6), light values. */
+  categorical: CategoricalPalette;
+  /** Phase 28 — the tint layer (accent/success/warning/danger/neutral-tint), light values. */
+  tints: TintLayer;
+  /** Dark counterparts for categorical + tints (merged into dark.colors by callers). */
+  darkRange: CategoricalPalette & TintLayer;
+  /** Present when the palette degraded deliberately (near-neutral seed, fewer hues). */
+  rangeNote?: string;
 } {
   const primary = generateRamp(seedHex);
   const neutral = matchedNeutral(seedHex);
@@ -234,5 +330,29 @@ export function generateColorSystem(seedHex: string): {
   const darkStatus = Object.fromEntries(
     Object.entries(status).map(([k, hex]) => [k, raiseForContrast(hex, dark['bg-elevated'] ?? dark['bg-surface'])]),
   ) as StatusColors;
-  return { seed: { hex: seedHex, oklch: hexToOklch(seedHex) }, primary, neutral, status, light, dark: { ...dark, ...darkStatus } };
+  // Phase 28 — the color range: categorical series + tints, both themes.
+  const cat = categoricalPalette(seedHex, { light: light['bg-surface'], dark: dark['bg-surface'] });
+  const tints = tintLayer({
+    'accent-tint': light.accent,
+    'success-tint': status.success,
+    'warning-tint': status.warning,
+    'danger-tint': status.danger,
+    'neutral-tint': light['text-secondary'],
+  }, 'light');
+  const darkFull = { ...dark, ...darkStatus };
+  const darkTints = tintLayer({
+    'accent-tint': darkFull.accent,
+    'success-tint': darkStatus.success,
+    'warning-tint': darkStatus.warning,
+    'danger-tint': darkStatus.danger,
+    'neutral-tint': darkFull['text-secondary'],
+  }, 'dark');
+  return {
+    seed: { hex: seedHex, oklch: hexToOklch(seedHex) }, primary, neutral, status, light,
+    dark: darkFull,
+    categorical: cat.palette,
+    tints,
+    darkRange: { ...cat.darkPalette, ...darkTints },
+    ...(cat.note ? { rangeNote: cat.note } : {}),
+  };
 }

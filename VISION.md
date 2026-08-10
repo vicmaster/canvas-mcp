@@ -520,7 +520,7 @@ _Full spec-driven breakdown in [`docs/specs/PHASE-27-SPEC.md`](docs/specs/PHASE-
 
 The reference-caliber attempt (2026-08-10) proved today's toolkit reaches a top-tier ops dashboard — at score 94, through eight hand-carried workarounds. This phase turns each workaround into vocabulary: the color families every data screen needs, the chart kinds the reference leaned on, an evaluator that recognizes dashboard language instead of fighting it, and the micro-pattern scaffolds dashboards repeat. Acceptance is literal: the attempt re-run with zero dodges at ≥ 95, light and dark.
 
-- [ ] Slice A — the color range: `$chart-1`…`$chart-6` categorical tokens (hue-walked from the seed, ≥ 3:1 on both themes' surfaces) + the `-tint` layer (`accent-tint` / `success-tint` / … paired with their text-tuned inks, AA both themes)
+- [x] Slice A — the color range: `$chart-1`…`$chart-6` categorical tokens (hue-walked from the seed, ≥ 3:1 on both themes' surfaces) + the `-tint` layer (`accent-tint` / `success-tint` / … paired with their text-tuned inks, AA both themes)
 - [ ] Slice B — dataviz primitives: donut chart kind (data-bound segments + center value slot), bar `highlight` + in-SVG gradients, sparkline kind
 - [ ] Slice C — evaluator vocabulary: token-ref exemptions for `$chart-*`/`$*-tint` on the accent-hue and gradient tells, aspect-ratio guard on fake-chrome, the KPI stat-signature exemption on the eyebrow census, `detectTable` three-row minimum
 - [ ] Slice D — micro-pattern scaffolds (`kpi-card`, `status-chip`, `segmented-control`, `breadcrumb`, `initials-avatar`) + the zero-dodge attempt re-run as proof

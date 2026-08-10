@@ -176,6 +176,8 @@ export function generateDesignSystem(
   for (const [step, hex] of Object.entries(colorSystem.primary)) colors[`primary-${step}`] = hex;
   for (const [step, hex] of Object.entries(colorSystem.neutral)) colors[`neutral-${step}`] = hex;
   Object.assign(colors, colorSystem.status, colorSystem.light);
+  // Phase 28 — the color range: categorical series + tint layer ride along.
+  Object.assign(colors, colorSystem.categorical, colorSystem.tints);
 
   // Type scale — the existing engine, pivoted by the personality.
   const baseSize = opts.baseSize ?? p.type.baseSize;
@@ -229,7 +231,7 @@ export function generateDesignSystem(
     radius,
     elevation: p.elevation.light,
     motion: p.motion,
-    dark: { colors: { ...colorSystem.dark }, elevation: p.elevation.dark },
+    dark: { colors: { ...colorSystem.dark, ...colorSystem.darkRange }, elevation: p.elevation.dark },
   };
 
   return { personality: personalityName, intent: p.intent, fonts: p.fonts, variables, colorSystem };

@@ -6,7 +6,7 @@
 // Usage: npx tsx test-color-system.ts
 
 import './test-env.js';
-import { hexToOklch, oklchToHex, generateRamp, matchedNeutral, statusColors, semanticMapping, generateColorSystem, RAMP_STEPS } from './src/color-system.js';
+import { hexToOklch, oklchToHex, generateRamp, matchedNeutral, statusColors, semanticMapping, generateColorSystem, categoricalPalette, tintLayer, RAMP_STEPS } from './src/color-system.js';
 import { contrastRatio, parseColor } from './src/evaluate.js';
 
 let allPass = true;
@@ -125,6 +125,55 @@ const aa = (fg: string, bg: string) => contrastRatio(rgb(fg), rgb(bg)) >= 4.5;
   let err = '';
   try { generateColorSystem('not-a-color'); } catch (e) { err = (e as Error).message; }
   check('unparseable seed errors clearly', err.includes('not a parseable color'), err);
+}
+
+// ── Phase 28 slice A: the color range ───────────────────────────────────────
+{
+  console.log('\n── categorical palette ──');
+  const cr = (a: string, b: string): number => contrastRatio(parseColor(a)!, parseColor(b)!);
+  const hueDist = (a: number, b: number) => { const d = Math.abs(a - b); return Math.min(d, 360 - d); };
+
+  for (const seed of ['#0E7490', '#2563EB', '#DC2626']) {
+    const sys = generateColorSystem(seed);
+    const light = Object.values(sys.categorical);
+    check(`${seed}: six series colors`, light.length === 6);
+    const hues = light.map((h) => hexToOklch(h).h);
+    const minSep = Math.min(...hues.flatMap((h, i) => hues.slice(i + 1).map((h2) => hueDist(h, h2))));
+    check(`${seed}: pairwise hue separation ≥ 30°`, minSep >= 29, minSep.toFixed(1));
+    check(`${seed}: series 1 carries the seed hue`, hueDist(hexToOklch(light[0]).h, hexToOklch(seed).h) < 12);
+    check(`${seed}: 3:1 on the light surface`, light.every((h) => cr(h, sys.light['bg-surface']) >= 2.95), light.map((h) => cr(h, sys.light['bg-surface']).toFixed(2)).join(','));
+    const darkHexes = Object.entries(sys.darkRange).filter(([k]) => k.startsWith('chart-')).map(([, v]) => v);
+    check(`${seed}: 3:1 on the dark surface`, darkHexes.every((h) => cr(h, sys.dark['bg-surface']) >= 2.95), darkHexes.map((h) => cr(h, sys.dark['bg-surface']).toFixed(2)).join(','));
+  }
+
+  const bluePal = Object.values(generateColorSystem('#2563EB').categorical).map((h) => hexToOklch(h).h);
+  check('non-purple seed avoids the purple band', bluePal.every((h) => h < 285 || h > 330), bluePal.map((h) => h.toFixed(0)).join(','));
+  const purplePal = generateColorSystem('#7C3AED').categorical;
+  check('purple seed keeps its own hue as chart-1', hueDist(hexToOklch(purplePal['chart-1']).h, hexToOklch('#7C3AED').h) < 12);
+
+  const grey = generateColorSystem('#808080');
+  check('near-neutral seed anchors at a stable hue + note', grey.rangeNote !== undefined && Object.values(grey.categorical).length === 6, grey.rangeNote);
+
+  console.log('\n── tint layer ──');
+  const sys = generateColorSystem('#0E7490');
+  const pairs: Array<[string, string]> = [
+    [sys.tints['accent-tint'], sys.light.accent],
+    [sys.tints['success-tint'], sys.status.success],
+    [sys.tints['warning-tint'], sys.status.warning],
+    [sys.tints['danger-tint'], sys.status.danger],
+    [sys.tints['neutral-tint'], sys.light['text-secondary']],
+  ];
+  check('light tint/ink pairs AA', pairs.every(([tint, ink]) => cr(ink, tint) >= 4.5), pairs.map(([t2, ink]) => cr(ink, t2).toFixed(2)).join(','));
+  const darkPairs: Array<[string, string]> = [
+    [sys.darkRange['accent-tint'], sys.dark.accent],
+    [sys.darkRange['success-tint'], sys.dark.success],
+    [sys.darkRange['warning-tint'], sys.dark.warning],
+    [sys.darkRange['danger-tint'], sys.dark.danger],
+    [sys.darkRange['neutral-tint'], sys.dark['text-secondary']],
+  ];
+  check('dark tint/ink pairs AA', darkPairs.every(([tint, ink]) => cr(ink, tint) >= 4.5), darkPairs.map(([t2, ink]) => cr(ink, t2).toFixed(2)).join(','));
+  check('tint carries its ink hue', hueDist(hexToOklch(sys.tints['success-tint']).h, hexToOklch(sys.status.success).h) < 15);
+  check('tints are soft washes (light, low chroma)', Object.values(sys.tints).every((h) => hexToOklch(h).l > 0.88 && hexToOklch(h).c < 0.08));
 }
 
 console.log(allPass ? '\nAll color-system tests passed.' : '\nSOME TESTS FAILED');
