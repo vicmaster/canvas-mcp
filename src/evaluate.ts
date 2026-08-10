@@ -1026,6 +1026,10 @@ function tellAccentHue(ctx: ClicheCtx): EvaluationIssue[] {
 
       const rawVal = raw?.[prop];
       const fromToken = typeof rawVal === 'string' && rawVal.startsWith('$');
+      // Phase 28 — the dataviz vocabulary is sanctioned by construction: a
+      // categorical series color or a tint surface referenced through its
+      // token may legitimately be violet. Literal purples still flag.
+      if (fromToken && /^\$(chart-\d+|[a-z-]+-tint)$/.test(rawVal as string)) continue;
       const hex = rgbToHex(rgb);
       const issue: EvaluationIssue = {
         category: 'cliche',
@@ -1075,7 +1079,14 @@ function tellGradientGlow(ctx: ClicheCtx): EvaluationIssue[] {
   if (ctx.relaxed.has('gradient-glow')) return [];
   const issues: EvaluationIssue[] = [];
 
-  const gradientNodes = ctx.entries.filter((e) => e.node.gradient != null);
+  // A gradient referenced through a $token is a design-system decision (the
+  // accent-hue precedent); chart-internal fades never appear here at all —
+  // they live inside the chart SVG, not on a node's gradient prop.
+  const gradientNodes = ctx.entries.filter((e) => {
+    if (e.node.gradient == null) return false;
+    const raw = ctx.rawById.get(e.node.id)?.gradient as unknown;
+    return !(typeof raw === 'string' && raw.startsWith('$'));
+  });
   const fillableCount = ctx.entries.filter((e) =>
     ['frame', 'rectangle', 'ellipse', 'component'].includes(e.node.type),
   ).length;
@@ -1140,9 +1151,13 @@ function tellFakeChrome(ctx: ClicheCtx): EvaluationIssue[] {
   const isSmallCircle = (n: SceneNode): boolean => {
     const w = typeof n.width === 'number' ? n.width : Infinity;
     if (w > 20) return false;
+    // Phase 28 — a dot is ROUND: near-square aspect required. Tall thin
+    // rounded bars (a hand-drawn sparkline) are not traffic lights.
+    const h = typeof n.height === 'number' ? n.height : w;
+    if (h > 20 || Math.max(w, h) / Math.max(1, Math.min(w, h)) > 1.5) return false;
     if (n.type === 'ellipse') return true;
     if ((n.type === 'frame' || n.type === 'rectangle') && typeof n.cornerRadius === 'number') {
-      return n.cornerRadius >= w / 2; // circular
+      return n.cornerRadius >= Math.min(w, h) / 2; // circular
     }
     return false;
   };
@@ -1272,7 +1287,24 @@ function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
   };
   const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= 28;
 
-  const eyebrowCount = ctx.entries.filter((e) => isEyebrowText(e.node) && !ctx.tableDescendantIds?.has(e.node.id)).length;
+  // Phase 28 — the KPI-card signature: an uppercase/tracked label that sits
+  // beside a large tabular figure labels a METRIC, not a section. Detected
+  // structurally (an ancestor within two hops contains a ≥20px tabular-nums
+  // text), so it works on any screen without a genre stamp.
+  const parentOf = new Map<string, SceneNode | null>();
+  for (const en of ctx.entries) parentOf.set(en.node.id, en.parent);
+  const hasStatValue = (n: SceneNode): boolean =>
+    (n.type === 'text' && typeof n.fontSize === 'number' && n.fontSize >= 20 && n.tabularNums === true)
+    || (n.children ?? []).some(hasStatValue);
+  const labelsAStat = (n: SceneNode): boolean => {
+    let cur = parentOf.get(n.id) ?? null;
+    for (let hop = 0; hop < 2 && cur; hop++) {
+      if (hasStatValue(cur)) return true;
+      cur = parentOf.get(cur.id) ?? null;
+    }
+    return false;
+  };
+  const eyebrowCount = ctx.entries.filter((e) => isEyebrowText(e.node) && !ctx.tableDescendantIds?.has(e.node.id) && !labelsAStat(e.node)).length;
   const sectionCount = ctx.entries.filter((e) => isHeading(e.node)).length;
   if (sectionCount < 2) return [];                      // too small to have a rhythm
 

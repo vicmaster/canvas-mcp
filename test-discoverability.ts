@@ -245,6 +245,13 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
   }
 }
 
+// ── Phase 28 slice C: the tells know dashboard vocabulary ────────────────────
+{
+  for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines]] as const) {
+    expect(`dataviz tell exemptions documented in ${surface[0]}`, /\$chart-\*/.test(surface[1]) || surface[1].includes('$chart-*'));
+  }
+}
+
 // ── Phase 28 slice B: dataviz primitives ─────────────────────────────────────
 {
   for (const surface of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {

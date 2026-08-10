@@ -41,6 +41,91 @@ async function testColorUtils() {
 }
 
 // --- FR-2 / C4: default purple accent ---
+
+// --- Phase 28 slice C: the evaluator knows dashboard language ---
+async function testDashboardVocabulary() {
+  console.log('\n── Phase 28: dashboard vocabulary ──');
+
+  // $chart-* / $*-tint refs are sanctioned even when violet…
+  const sanctioned = build('chart-tokens', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+dot=I(page, {type:"ellipse", width:8, height:8, fill:"$chart-2"})
+chip=I(page, {type:"frame", width:80, padding:[4,8], cornerRadius:999, fill:"$violet-tint"})
+I(chip, {type:"text", content:"Beta", fontSize:12, color:"$chart-2"})
+`);
+  sanctioned.variables = { colors: { 'chart-2': '#7C3AED', 'violet-tint': '#EDE6FB' } };
+  assert(tells(await cliche(sanctioned), 'accent-hue').length === 0, 'violet through $chart-*/$*-tint refs → clean');
+
+  // …literal violets still flag
+  const literal = build('literal-violet', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+I(page, {type:"ellipse", width:8, height:8, fill:"#7C3AED"})
+`);
+  assert(tells(await cliche(literal), 'accent-hue').length >= 1, 'a literal violet still flags');
+
+  // …and a purple through a NON-sanctioned token keeps the token-level advice
+  const otherTok = build('other-token', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+I(page, {type:"ellipse", width:8, height:8, fill:"$brand"})
+`);
+  otherTok.variables = { colors: { brand: '#7C3AED' } };
+  assert(tells(await cliche(otherTok), 'accent-hue').length >= 1, 'a purple through a non-dataviz token still flags');
+
+  // token-referenced gradients don't count toward overuse; literals do
+  const gradTok = build('grad-tokens', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+a=I(page, {type:"frame", width:200, height:80, gradient:"$hero-fade"})
+b=I(page, {type:"frame", width:200, height:80, gradient:"$hero-fade"})
+c=I(page, {type:"frame", width:200, height:80, gradient:"$hero-fade"})
+`);
+  gradTok.variables = { colors: { 'hero-fade': 'linear-gradient(180deg, #2563EB, #0D9488)' } };
+  assert(tells(await cliche(gradTok), 'gradient-glow').length === 0, 'token-referenced gradients exempt from overuse');
+  const gradLit = build('grad-literals', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+a=I(page, {type:"frame", width:200, height:80, gradient:"linear-gradient(180deg, #111, #222)"})
+b=I(page, {type:"frame", width:200, height:80, gradient:"linear-gradient(180deg, #111, #222)"})
+c=I(page, {type:"frame", width:200, height:80, gradient:"linear-gradient(180deg, #111, #222)"})
+`);
+  assert(tells(await cliche(gradLit), 'gradient-glow').length === 1, 'literal gradient overuse still flags');
+
+  // hand-drawn sparkline bars are not traffic lights…
+  const bars = build('spark-bars', `
+row=I("document", {type:"frame", width:120, layout:"horizontal", gap:2, alignItems:"end"})
+I(row, {type:"frame", width:4, height:12, cornerRadius:2, fill:"#94A3B8"})
+I(row, {type:"frame", width:4, height:18, cornerRadius:2, fill:"#94A3B8"})
+I(row, {type:"frame", width:4, height:24, cornerRadius:2, fill:"#94A3B8"})
+I(row, {type:"frame", width:4, height:16, cornerRadius:2, fill:"#94A3B8"})
+`);
+  assert(tells(await cliche(bars), 'fake-chrome').length === 0, 'thin rounded bars are not traffic lights');
+
+  // …real dots still are
+  const dots = build('real-dots', `
+bar=I("document", {type:"frame", name:"window-bar", width:400, layout:"horizontal", gap:8})
+I(bar, {type:"ellipse", width:12, height:12, fill:"#ff5f56"})
+I(bar, {type:"ellipse", width:12, height:12, fill:"#ffbd2e"})
+I(bar, {type:"ellipse", width:12, height:12, fill:"#27c93f"})
+`);
+  assert(tells(await cliche(dots), 'fake-chrome').length === 1, 'a real traffic-light strip still flags');
+
+  // KPI-card labels beside big tabular figures are not eyebrows…
+  const kpis = build('kpi-labels', `
+page=I("document", {type:"frame", width:1200, layout:"horizontal", gap:16})
+k1=I(page, {type:"frame", layout:"vertical", gap:8, padding:16})
+I(k1, {type:"text", content:"FORMS COLLECTED", fontSize:12, textTransform:"uppercase", letterSpacing:0.5})
+I(k1, {type:"text", content:"1,204", fontSize:28, fontWeight:700, tabularNums:true})
+k2=I(page, {type:"frame", layout:"vertical", gap:8, padding:16})
+I(k2, {type:"text", content:"ACTIVE AGENTS", fontSize:12, textTransform:"uppercase", letterSpacing:0.5})
+I(k2, {type:"text", content:"18", fontSize:28, fontWeight:700, tabularNums:true})
+k3=I(page, {type:"frame", layout:"vertical", gap:8, padding:16})
+I(k3, {type:"text", content:"FLAGS RAISED", fontSize:12, textTransform:"uppercase", letterSpacing:0.5})
+I(k3, {type:"text", content:"3", fontSize:28, fontWeight:700, tabularNums:true})
+k4=I(page, {type:"frame", layout:"vertical", gap:8, padding:16})
+I(k4, {type:"text", content:"AVG FORMS", fontSize:12, textTransform:"uppercase", letterSpacing:0.5})
+I(k4, {type:"text", content:"134", fontSize:28, fontWeight:700, tabularNums:true})
+`);
+  assert(tells(await cliche(kpis), 'eyebrow-rhythm').length === 0, 'uppercase KPI labels beside tabular figures are not eyebrows');
+}
+
 async function testAccentHue() {
   console.log('\n── tell: default purple/indigo accent ──');
 
@@ -379,6 +464,7 @@ async function main() {
   await testAccentConsistency();
   await testCleanAndCategory();
   await testAutofixSurfacing();
+  await testDashboardVocabulary();
 
   console.log(`\n${passed} passed, ${failed} failed`);
   await shutdown();

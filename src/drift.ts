@@ -117,7 +117,11 @@ function detectTable(node: SceneNode): { columnCount: number; headers: string[];
   const named0 = node.name === 'Table';
   const rows = node.children.filter((c) => c.type === 'frame' && (c.children?.length ?? 0) >= 2
     && (named0 || c.layout === 'horizontal'));
-  if (rows.length < 2) return null;
+  // Phase 28 — two stacked rows (a topbar over a greeting) is a LAYOUT; an
+  // unnamed table needs three matching rows before it reads as data. The
+  // rare real header-plus-one-row table loses detection — accepted trade,
+  // recorded in the drift docs. Import-named Tables keep the loose shape.
+  if (rows.length < (named0 ? 2 : 3)) return null;
   const named = named0;
   // Modal cell count across candidate rows; require it to dominate unless the
   // frame is an import-named Table (trusted shape).
