@@ -52,6 +52,14 @@ const ELEV = {
 const TYPE = {
   title: '$title',     // page titles — the display face when a personality is set
 } as const;
+/** Phase 28 — the tint pair: tint as the FILL, base color as the INK. */
+const TINT = {
+  accent: { bg: '$accent-tint', ink: COLOR.accent },
+  success: { bg: '$success-tint', ink: '$success' },
+  warning: { bg: '$warning-tint', ink: '$warning' },
+  danger: { bg: '$danger-tint', ink: '$danger' },
+  neutral: { bg: '$neutral-tint', ink: COLOR.textSecondary },
+} as const;
 
 /** A labeled placeholder card — a surface with a role label + neutral body. */
 function card(
@@ -109,34 +117,68 @@ function stat(id: string, icon = 'activity'): SceneNode {
   return {
     id,
     type: 'frame',
-    name: 'Stat',
+    name: 'KPI card',
     width: 300,
     layout: 'vertical',
-    gap: SPACE.xs,
-    padding: SPACE.lg,
+    gap: SPACE.sm,
+    padding: SPACE.md,
     cornerRadius: RADIUS.md,
     fill: COLOR.bgSurface,
     stroke: COLOR.border,
     strokeWidth: 1,
     shadow: ELEV.flat,
+    minWidth: 0,
     children: [
       {
         id: `${id}-head`, type: 'frame', name: 'Label row', width: '100%', layout: 'horizontal',
-        alignItems: 'center', justifyContent: 'space-between',
+        alignItems: 'center', justifyContent: 'space-between', gap: SPACE.xs,
         children: [
-          // Sentence case, no tracking — a stat label is a label, not an eyebrow.
-          { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 12, fontWeight: 500, color: COLOR.textSecondary },
-          { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: COLOR.textSecondary },
+          {
+            id: `${id}-hl`, type: 'frame', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs, minWidth: 0,
+            children: [
+              {
+                id: `${id}-tile`, type: 'frame', name: 'Icon tile', width: 30, height: 30, cornerRadius: RADIUS.sm,
+                fill: TINT.accent.bg, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+                children: [{ id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: TINT.accent.ink }],
+              },
+              // Uppercase is sanctioned here: the eyebrow census knows a label
+              // beside a big tabular figure names a metric, not a section.
+              { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+            ],
+          },
+          { id: `${id}-menu`, type: 'icon', icon: 'ellipsis-vertical', iconSize: 14, iconColor: COLOR.textSecondary },
         ],
       },
-      { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, letterSpacing: -0.5, tabularNums: true, textOverflow: 'ellipsis' },
       {
-        id: `${id}-delta`, type: 'frame', name: 'Delta', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
-        width: '100%', overflow: 'hidden',
+        id: `${id}-vr`, type: 'frame', name: 'Value row', width: '100%', layout: 'horizontal',
+        alignItems: 'end', justifyContent: 'space-between', gap: SPACE.sm, overflow: 'hidden',
         children: [
-          { id: `${id}-delta-icon`, type: 'icon', icon: 'trending-up', iconSize: 14, iconColor: '$success' },
-          { id: `${id}-delta-text`, type: 'text', content: 'Change — TBD', fontSize: 12, fontWeight: 600, color: '$success', textOverflow: 'ellipsis' },
-          { id: `${id}-delta-period`, type: 'text', content: 'vs last period', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+          {
+            id: `${id}-vc`, type: 'frame', layout: 'horizontal', alignItems: 'end', gap: SPACE.xs2, minWidth: 0,
+            children: [
+              { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, letterSpacing: -0.5, tabularNums: true, textOverflow: 'ellipsis' },
+              { id: `${id}-ctx`, type: 'text', content: 'of target', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+            ],
+          },
+          {
+            id: `${id}-spark`, type: 'chart', name: 'Sparkline', kind: 'sparkline', width: 64, height: 26,
+            series: [{ data: [40, 55, 45, 70, 60, 85, 100], stroke: COLOR.accent }],
+          },
+        ],
+      },
+      {
+        id: `${id}-foot`, type: 'frame', name: 'Delta row', width: '100%', layout: 'horizontal',
+        alignItems: 'center', justifyContent: 'space-between', gap: SPACE.xs, overflow: 'hidden',
+        children: [
+          { id: `${id}-period`, type: 'text', content: 'vs last period', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+          {
+            id: `${id}-pill`, type: 'frame', name: 'Pill', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+            padding: [2, SPACE.xs], cornerRadius: 999, fill: TINT.success.bg, overflow: 'hidden',
+            children: [
+              { id: `${id}-pill-icon`, type: 'icon', icon: 'trending-up', iconSize: 12, iconColor: TINT.success.ink },
+              { id: `${id}-pill-text`, type: 'text', content: 'Change — TBD', fontSize: 12, fontWeight: 600, color: TINT.success.ink, textOverflow: 'ellipsis' },
+            ],
+          },
         ],
       },
     ],
@@ -641,7 +683,7 @@ const catalogue: Structure = {
 const dashboard: Structure = {
   name: 'dashboard',
   description:
-    'Application dashboard — a real product shell: sidebar with grouped navigation (active item, badge count, account row) beside a main column with a topbar (title, search, primary action), a stat row with delta chips, then a labeled chart with legend next to an activity feed with icon tiles and timestamps. Dense and split; stacks on mobile. The default first screen for tools and admin apps.',
+    'Application dashboard — a real product shell: sidebar with grouped navigation (active item, badge count, account row) beside a main column with a topbar (title, search, primary action), a row of kpi-cards, then a labeled chart with legend next to an activity feed with icon tiles and timestamps. Dense and split; stacks on mobile. The default first screen for tools and admin apps.',
   axes: { heroTreatment: 'none', density: 'dense', rhythm: 'uniform', alignment: 'split' },
   nodes: [
     {
@@ -1042,7 +1084,7 @@ const toggleRow: Structure = {
 const statCard: Structure = {
   name: 'stat-card',
   kind: 'component',
-  description: 'A single stat block: value slot over a label. Stamp several in a horizontal frame for a stat band.',
+  description: 'The original name for the KPI-card anatomy (tinted icon tile, uppercase metric label, big tabular value, sparkline, tinted delta pill) — kept as an alias for existing callers. Prefer kpi-card for new work; the two stamp the same structure. Stamp several in a horizontal frame for a stat band.',
   nodes: [stat('sc')],
 };
 
@@ -1279,13 +1321,100 @@ const skeletonStatCard: Structure = {
   kind: 'component',
   description: 'Loading state for a stat card: label bar, value bar, and delta bar as skeletons — same silhouette as the loaded stat. Stamp one per stat in the row so a loading dashboard skeletons EVERY data surface, not just the table.',
   nodes: [{
-    id: 'sks', type: 'frame', name: 'Skeleton stat', width: 300, layout: 'vertical', gap: SPACE.xs,
-    padding: SPACE.lg, cornerRadius: RADIUS.md, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
+    id: 'sks', type: 'frame', name: 'Skeleton stat', width: 300, layout: 'vertical', gap: SPACE.sm,
+    padding: SPACE.md, cornerRadius: RADIUS.md, fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
     children: [
-      { id: 'sks-label', type: 'skeleton', width: '40%', height: 10 },
-      { id: 'sks-value', type: 'skeleton', width: '60%', height: 24 },
-      { id: 'sks-delta', type: 'skeleton', width: '50%', height: 10 },
+      {
+        id: 'sks-head', type: 'frame', width: '100%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
+        children: [
+          { id: 'sks-tile', type: 'skeleton', width: 30, height: 30, cornerRadius: RADIUS.sm },
+          { id: 'sks-label', type: 'skeleton', width: '40%', height: 10 },
+        ],
+      },
+      {
+        id: 'sks-vr', type: 'frame', width: '100%', layout: 'horizontal', alignItems: 'end', justifyContent: 'space-between', gap: SPACE.sm,
+        children: [
+          { id: 'sks-value', type: 'skeleton', width: '45%', height: 24 },
+          { id: 'sks-spark', type: 'skeleton', width: 64, height: 26 },
+        ],
+      },
+      { id: 'sks-delta', type: 'skeleton', width: '55%', height: 10 },
     ],
+  }],
+};
+
+// ── Phase 28 slice D — dashboard micro-patterns ─────────────────────────────
+// The five patterns the reference attempt hand-built. All on the tint pair
+// (tint fill + base ink) and the chart vocabulary; customize via idMap.
+
+const kpiCard: Structure = {
+  name: 'kpi-card',
+  kind: 'component',
+  description: 'A reference-grade KPI card: tinted icon tile + uppercase metric label, big tabular value with inline context, a live sparkline, and a tinted delta pill. The dashboard structure stamps these; customize copy/data via the idMap.',
+  nodes: [stat('kpi')],
+};
+
+const statusChip: Structure = {
+  name: 'status-chip',
+  kind: 'component',
+  description: 'A status chip on the tint pair: soft tinted pill + icon + label in the matching ink (fill "$success-tint" + color "$success" — AA by construction both themes). Swap the tint/ink pair and icon per status via the idMap.',
+  nodes: [{
+    id: 'chip', type: 'frame', name: 'Status chip', layout: 'horizontal', alignItems: 'center',
+    gap: SPACE.xs2, padding: [2, SPACE.xs], cornerRadius: 999, fill: TINT.success.bg, overflow: 'hidden',
+    children: [
+      { id: 'chip-icon', type: 'icon', icon: 'circle-check', iconSize: 12, iconColor: TINT.success.ink },
+      { id: 'chip-label', type: 'text', content: 'Status — TBD', fontSize: 12, fontWeight: 600, color: TINT.success.ink, textOverflow: 'ellipsis' },
+    ],
+  }],
+};
+
+const segmentedControl: Structure = {
+  name: 'segmented-control',
+  kind: 'component',
+  description: 'A segmented range control (7D / 15D / All): one raised active segment on an elevated track. Set the active segment by moving the surface fill + weight; label via the idMap.',
+  nodes: [{
+    id: 'seg', type: 'frame', name: 'Segmented control', layout: 'horizontal', alignItems: 'center',
+    padding: 2, cornerRadius: RADIUS.sm, fill: COLOR.bgElevated,
+    children: [
+      {
+        id: 'seg-a', type: 'frame', name: 'Segment A', layout: 'horizontal', padding: [SPACE.xs2, SPACE.sm], cornerRadius: 6,
+        fill: COLOR.bgSurface, shadow: ELEV.flat,
+        children: [{ id: 'seg-a-label', type: 'text', content: 'Option A', fontSize: 12, fontWeight: 600, color: COLOR.textPrimary, tabularNums: true }],
+      },
+      {
+        id: 'seg-b', type: 'frame', name: 'Segment B', layout: 'horizontal', padding: [SPACE.xs2, SPACE.sm], cornerRadius: 6,
+        children: [{ id: 'seg-b-label', type: 'text', content: 'Option B', fontSize: 12, fontWeight: 500, color: COLOR.textSecondary, tabularNums: true }],
+      },
+      {
+        id: 'seg-c', type: 'frame', name: 'Segment C', layout: 'horizontal', padding: [SPACE.xs2, SPACE.sm], cornerRadius: 6,
+        children: [{ id: 'seg-c-label', type: 'text', content: 'Option C', fontSize: 12, fontWeight: 500, color: COLOR.textSecondary, tabularNums: true }],
+      },
+    ],
+  }],
+};
+
+const breadcrumb: Structure = {
+  name: 'breadcrumb',
+  kind: 'component',
+  description: 'A two-level breadcrumb: muted parent, chevron, bold current page. Extend by copying the parent+chevron pair via batch_design.',
+  nodes: [{
+    id: 'crumb', type: 'frame', name: 'Breadcrumb', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+    children: [
+      { id: 'crumb-parent', type: 'text', content: 'Parent', fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+      { id: 'crumb-sep', type: 'icon', icon: 'chevron-right', iconSize: 14, iconColor: COLOR.textSecondary },
+      { id: 'crumb-current', type: 'text', content: 'Current page', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+    ],
+  }],
+};
+
+const initialsAvatar: Structure = {
+  name: 'initials-avatar',
+  kind: 'component',
+  description: 'An initials avatar on the tint pair: tinted circle + two-letter monogram in the matching ink. Size/tint/initials via the idMap.',
+  nodes: [{
+    id: 'av', type: 'frame', name: 'Avatar', width: 32, height: 32, cornerRadius: 999,
+    fill: TINT.accent.bg, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
+    children: [{ id: 'av-initials', type: 'text', content: 'AB', fontSize: 12, fontWeight: 700, color: TINT.accent.ink }],
   }],
 };
 
@@ -1312,6 +1441,12 @@ const structureMap = new Map<string, Structure>([
   ['skeleton-table', skeletonTable],
   ['skeleton-card', skeletonCard],
   ['skeleton-stat-card', skeletonStatCard],
+  // Phase 28 — dashboard micro-patterns
+  ['kpi-card', kpiCard],
+  ['status-chip', statusChip],
+  ['segmented-control', segmentedControl],
+  ['breadcrumb', breadcrumb],
+  ['initials-avatar', initialsAvatar],
 ]);
 
 export function listStructures(): { name: string; kind: 'page' | 'component'; description: string; axes?: StructureAxes }[] {
@@ -1345,6 +1480,14 @@ const DEFAULT_SCAFFOLD_COLORS: Record<string, string> = {
   'success': '#4ADE80',
   'warning': '#FBBF24',
   'danger': '#F87171',
+  // Phase 28 — the tint layer (chips, icon tiles, pills, avatars). Dark
+  // washes paired with the inks above; generated systems override with
+  // seed-derived tints in both themes.
+  'accent-tint': '#152A47',
+  'success-tint': '#0F2E1B',
+  'warning-tint': '#33260A',
+  'danger-tint': '#3A1715',
+  'neutral-tint': '#25282D',
 };
 
 /** Phase 27 slice B — default values for the non-color token namespaces the

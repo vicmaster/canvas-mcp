@@ -1296,10 +1296,17 @@ function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
   const hasStatValue = (n: SceneNode): boolean =>
     (n.type === 'text' && typeof n.fontSize === 'number' && n.fontSize >= 20 && n.tabularNums === true)
     || (n.children ?? []).some(hasStatValue);
+  // Climb to the containing CARD within three hops — a KPI card may nest its
+  // label a row deeper than its value. The guard at the third hop is
+  // COMPACTNESS: a KPI card is a small container (label + value + trim); a
+  // marketing section holding a stat card somewhere inside it is large, so
+  // its genuine eyebrows keep counting.
+  const descendantCount = (n: SceneNode): number =>
+    1 + (n.children ?? []).reduce((sum, ch) => sum + descendantCount(ch), 0);
   const labelsAStat = (n: SceneNode): boolean => {
     let cur = parentOf.get(n.id) ?? null;
-    for (let hop = 0; hop < 2 && cur; hop++) {
-      if (hasStatValue(cur)) return true;
+    for (let hop = 0; hop < 3 && cur; hop++) {
+      if (hasStatValue(cur) && (hop < 2 || descendantCount(cur) <= 20)) return true;
       cur = parentOf.get(cur.id) ?? null;
     }
     return false;
