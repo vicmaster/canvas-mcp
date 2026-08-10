@@ -217,8 +217,9 @@ export function chartGeometry(node: SceneNode, boxW: number, boxH: number): Char
   if (!series.length) return null;
   const maxLen = Math.max(...series.map((s) => s.data.length));
 
-  const padLeft = node.yLabels?.length ? 44 : 0;
-  const padBottom = node.xLabels?.length ? 22 : 0;
+  const spark = node.kind === 'sparkline';
+  const padLeft = !spark && node.yLabels?.length ? 44 : 0;
+  const padBottom = !spark && node.xLabels?.length ? 22 : 0;
   const padTop = 4;
   const plotW = Math.max(1, boxW - padLeft - 4);
   const plotH = Math.max(1, boxH - padTop - padBottom);
@@ -226,7 +227,7 @@ export function chartGeometry(node: SceneNode, boxW: number, boxH: number): Char
   const [dx0, dx1] = node.xDomain ?? [0, Math.max(1, maxLen - 1)];
   const values = series.flatMap((s) => s.data);
   let [dy0, dy1] = node.yDomain ?? [Math.min(...values), Math.max(...values)];
-  if (!node.yDomain && node.kind === 'bar') dy0 = Math.min(0, dy0);
+  if (!node.yDomain && (node.kind === 'bar' || node.kind === 'sparkline')) dy0 = Math.min(0, dy0);
   if (dy1 === dy0) dy1 = dy0 + 1;
 
   const xSpan = dx1 - dx0 || 1;
@@ -238,7 +239,7 @@ export function chartGeometry(node: SceneNode, boxW: number, boxH: number): Char
 }
 
 /** Sanitized series: finite numbers only, empty series dropped, colors defaulted. */
-function chartSeriesData(node: SceneNode): Array<{ data: number[]; stroke: string; strokeWidth: number; dash: string | null; area: boolean; points: boolean }> {
+function chartSeriesData(node: SceneNode): Array<{ data: number[]; stroke: string; strokeWidth: number; dash: string | null; area: boolean; points: boolean; highlight: number[] | null; barGradient: boolean }> {
   return (node.series ?? [])
     .filter((s) => s && Array.isArray(s.data))
     .map((s, i) => ({
@@ -248,6 +249,8 @@ function chartSeriesData(node: SceneNode): Array<{ data: number[]; stroke: strin
       dash: dasharrayValue(s.strokeDasharray),
       area: s.area === true,
       points: s.points === true,
+      highlight: Array.isArray(s.highlight) ? s.highlight.filter((n) => typeof n === 'number') : null,
+      barGradient: s.barGradient === true,
     }))
     .filter((s) => s.data.length > 0);
 }
@@ -272,7 +275,63 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Annular-sector path (a donut slice): outer arc, line to inner radius,
+ * inner arc back, close. Angles in degrees, 0 = 12 o'clock, clockwise. */
+function donutSlicePath(cx: number, cy: number, rOuter: number, rInner: number, a0: number, a1: number): string {
+  const pt = (r: number, deg: number): [number, number] => {
+    const rad = ((deg - 90) * Math.PI) / 180;
+    return [round2(cx + r * Math.cos(rad)), round2(cy + r * Math.sin(rad))];
+  };
+  const large = a1 - a0 > 180 ? 1 : 0;
+  const [ox0, oy0] = pt(rOuter, a0);
+  const [ox1, oy1] = pt(rOuter, a1);
+  const [ix1, iy1] = pt(rInner, a1);
+  const [ix0, iy0] = pt(rInner, a0);
+  return `M${ox0} ${oy0} A${rOuter} ${rOuter} 0 ${large} 1 ${ox1} ${oy1} L${ix1} ${iy1} A${rInner} ${rInner} 0 ${large} 0 ${ix0} ${iy0} Z`;
+}
+
+/** Phase 28 — the donut kind: data-bound slices + center value/label slots.
+ * Legends stay agent-composed frames (layout is design, not charting). */
+function renderDonutSvg(node: SceneNode): string {
+  const boxW = typeof node.width === 'number' ? node.width : 200;
+  const boxH = typeof node.height === 'number' ? node.height : 200;
+  const segs = (node.segments ?? []).filter((s) => s && typeof s.value === 'number' && isFinite(s.value) && s.value > 0 && typeof s.color === 'string');
+  if (!segs.length) return '<!-- donut: no segments -->';
+  const total = segs.reduce((sum, s) => sum + s.value, 0);
+  const cx = boxW / 2;
+  const cy = boxH / 2;
+  const rOuter = Math.min(boxW, boxH) / 2;
+  const ratio = typeof node.innerRatio === 'number' && node.innerRatio > 0 && node.innerRatio < 1 ? node.innerRatio : 0.72;
+  const rInner = rOuter * ratio;
+  const parts: string[] = [];
+  let angle = 0;
+  for (const s of segs) {
+    const sweep = (s.value / total) * 360;
+    // A full-circle slice degenerates as one arc — split it in two halves.
+    if (sweep >= 359.99) {
+      parts.push(`<path d="${donutSlicePath(cx, cy, rOuter, rInner, 0, 180)}" fill="${escapeAttr(s.color)}" />`);
+      parts.push(`<path d="${donutSlicePath(cx, cy, rOuter, rInner, 180, 360)}" fill="${escapeAttr(s.color)}" />`);
+    } else {
+      parts.push(`<path d="${donutSlicePath(cx, cy, rOuter, rInner, angle, angle + sweep)}" fill="${escapeAttr(s.color)}" />`);
+    }
+    angle += sweep;
+  }
+  if (typeof node.centerValue === 'string' && node.centerValue) {
+    const valueSize = Math.max(12, Math.round(rInner * 0.42));
+    const valueColor = escapeAttr(node.color ?? '#111827');
+    const hasLabel = typeof node.centerLabel === 'string' && node.centerLabel;
+    const vy = hasLabel ? cy - valueSize * 0.12 : cy + valueSize * 0.35;
+    parts.push(`<text x="${round2(cx)}" y="${round2(vy)}" font-size="${valueSize}" font-weight="700" fill="${valueColor}" text-anchor="middle" style="font-variant-numeric: tabular-nums">${escapeHtml(node.centerValue)}</text>`);
+    if (hasLabel) {
+      const labelSize = Math.max(10, Math.round(rInner * 0.18));
+      parts.push(`<text x="${round2(cx)}" y="${round2(cy + valueSize * 0.55 + labelSize * 0.6)}" font-size="${labelSize}" fill="${CHART_LABEL_COLOR}" text-anchor="middle">${escapeHtml(node.centerLabel!)}</text>`);
+    }
+  }
+  return `<svg width="100%" height="100%" viewBox="0 0 ${boxW} ${boxH}" xmlns="http://www.w3.org/2000/svg" style="display: block">${parts.join('')}</svg>`;
+}
+
 function renderChartSvg(node: SceneNode): string {
+  if (node.kind === 'donut') return renderDonutSvg(node);
   const boxW = typeof node.width === 'number' ? node.width : 600;
   const boxH = typeof node.height === 'number' ? node.height : 240;
   const geom = chartGeometry(node, boxW, boxH);
@@ -288,12 +347,22 @@ function renderChartSvg(node: SceneNode): string {
   }
 
   const baselineY = round2(geom.y0 + geom.plotH);
-  if (node.kind === 'bar') {
+  const spark = node.kind === 'sparkline';
+  const barForm = node.kind === 'bar' || (spark && (node.sparkKind ?? 'bar') === 'bar');
+  if (barForm) {
+    // SVG ids are document-global — scope gradient defs to this node.
+    const idBase = `fs-grad-${String(node.id).replace(/[^a-zA-Z0-9_-]/g, '')}`;
     const maxLen = Math.max(...series.map((s) => s.data.length));
     const band = geom.plotW / maxLen;
-    const inner = band * 0.8;
+    const inner = band * (spark ? 0.7 : 0.8);
     const barW = Math.max(1, (inner - 2 * (series.length - 1)) / series.length);
     series.forEach((s, si) => {
+      if (s.barGradient) {
+        parts.push(`<defs><linearGradient id="${idBase}-${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${escapeAttr(s.stroke)}" stop-opacity="0.85" /><stop offset="100%" stop-color="${escapeAttr(s.stroke)}" stop-opacity="0.15" /></linearGradient></defs>`);
+      }
+      // Emphasis: explicit highlight indices render solid, the rest muted.
+      // A sparkline defaults to emphasizing its latest point.
+      const highlight = s.highlight ?? (spark ? [s.data.length - 1] : null);
       const clampY = (y: number) => Math.min(Math.max(y, geom.y0), geom.y0 + geom.plotH);
       const zeroY = clampY(geom.y(0)); // bars grow from the zero line (clamped into the plot)
       s.data.forEach((v, i) => {
@@ -301,7 +370,10 @@ function renderChartSvg(node: SceneNode): string {
         const top = Math.min(yv, zeroY);
         const h = Math.max(1, Math.abs(zeroY - yv));
         const bx = geom.x0 + i * band + (band - inner) / 2 + si * (barW + 2);
-        parts.push(`<rect x="${round2(bx)}" y="${round2(top)}" width="${round2(barW)}" height="${round2(h)}" fill="${escapeAttr(s.stroke)}" rx="2" />`);
+        const hot = highlight === null || highlight.includes(i);
+        const fill = !hot && s.barGradient ? `url(#${idBase}-${si})` : escapeAttr(s.stroke);
+        const mute = hot || s.barGradient ? '' : ' fill-opacity="0.3"';
+        parts.push(`<rect x="${round2(bx)}" y="${round2(top)}" width="${round2(barW)}" height="${round2(h)}" fill="${fill}"${mute} rx="${spark ? 1 : 2}" />`);
       });
     });
   } else {
@@ -321,14 +393,14 @@ function renderChartSvg(node: SceneNode): string {
     }
   }
 
-  // Tick labels: spread evenly along the bottom / left edges.
+  // Tick labels: spread evenly along the bottom / left edges (never on sparklines).
   const labelColor = escapeAttr(node.color ?? CHART_LABEL_COLOR);
-  for (const [i, label] of (node.xLabels ?? []).entries()) {
+  for (const [i, label] of ((spark ? [] : node.xLabels) ?? []).entries()) {
     const n = node.xLabels!.length;
     const lx = round2(geom.x0 + (n === 1 ? 0.5 : i / (n - 1)) * geom.plotW);
     parts.push(`<text x="${lx}" y="${round2(baselineY + 16)}" font-size="${CHART_LABEL_SIZE}" fill="${labelColor}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}" style="font-variant-numeric: tabular-nums">${escapeHtml(label)}</text>`);
   }
-  for (const [i, label] of (node.yLabels ?? []).entries()) {
+  for (const [i, label] of ((spark ? [] : node.yLabels) ?? []).entries()) {
     const n = node.yLabels!.length;
     const ly = round2(geom.y0 + geom.plotH - (n === 1 ? 0.5 : i / (n - 1)) * geom.plotH);
     parts.push(`<text x="${geom.x0 - 8}" y="${ly + 4}" font-size="${CHART_LABEL_SIZE}" fill="${labelColor}" text-anchor="end" style="font-variant-numeric: tabular-nums">${escapeHtml(label)}</text>`);

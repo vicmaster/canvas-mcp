@@ -83,6 +83,15 @@ function deepResolve(node: SceneNode, variables: DesignVariables): SceneNode {
       }
     }
   }
+  // Phase 28 slice B — donut segments carry their own colors ($chart-* refs).
+  if (Array.isArray(node.segments)) {
+    for (const s of node.segments) {
+      if (s && typeof s.color === 'string' && s.color.startsWith('$')) {
+        const resolved = lookupToken(s.color.slice(1), variables);
+        if (resolved !== undefined) s.color = resolved as string;
+      }
+    }
+  }
 
   applyControlDefaults(node, variables);
 
