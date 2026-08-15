@@ -14,7 +14,7 @@ import { detectBinding, projectStartDir, readWorkspaceFile, setRepoBackend, regi
 import { bindRepo, initWorkspace } from './bind.js';
 import { parseAndExecute, ignoredShadowWarning } from './operations.js';
 import { promoteToComponent, copyNodesAcross } from './components.js';
-import { resolveVariables, setVariables, getVariables, applyPresetTokens } from './variables.js';
+import { resolveVariables, setVariables, getVariables, applyPresetTokens, type PresetApplyResult } from './variables.js';
 import { renderToHtml, type RenderOptions } from './renderer.js';
 import { ensureFontsForRender, bodyFontFamilyFromTokens, resolveFamily, warmFamilies, resolveStylesheetUrl, isStylesheetUrl, collectReferencedFamilies, unverifiedFamiliesInOps } from './fonts.js';
 import { takeScreenshot, computeLayout, exportToFile, takeResponsiveScreenshots, computeDiff, shutdown } from './screenshot.js';
@@ -998,14 +998,15 @@ server.tool(
   'generate_color_system',
   `One seed color → a full perceptual color system: OKLCH ramps primary-50…900 (even lightness steps, chroma tapered at the extremes, gamut-clipped toward lower chroma — never hue-shifted), a matched neutral ramp (a whisper of the seed's hue — never dead grey, never visibly tinted), status colors (success / warning / danger, hue held but darkened until each clears WCAG AA as TEXT on the generated light page surface — the invariant is shared contrast, not shared lightness, and tuning against that off-white surface rather than pure white is the stricter target, so white passes too), and the SEMANTIC tokens the structures already speak: bg-primary, bg-surface, bg-elevated, text-primary, text-secondary, border, accent. Text and accent steps are picked by MEASURED contrast — every semantic text/surface pair clears WCAG AA by construction, not by hope.
 
-The DARK theme ships in the same call (the Radix pattern: a reversed walk of the same ramps, not inverted hex): the semantic dark mapping is WRITTEN to the layer's dark.colors override — so theme: "dark" on screenshot/export renders it and canvas_evaluate contrast-checks BOTH themes from then on. Status colors get a SECOND pass for dark: the light-tuned success/warning/danger are re-lit (hue held) until each clears AA against the lightest dark surface (bg-elevated) too, so a $danger message reads in both themes. Phase 28 adds THE COLOR RANGE in the same call: chart-1…chart-6 categorical series tokens (a deterministic hue walk from the seed, ≥ 30° apart, each clearing the 3:1 graphical-object floor on BOTH themes' surfaces — reference them from chart segments/series and legend dots) and the TINT LAYER — accent-tint / success-tint / warning-tint / danger-tint / neutral-tint: soft same-hue surfaces for status chips, icon tiles, pill badges, and initials avatars. The pairing rule is one sentence: tint as the FILL, its base color as the INK (fill: "$success-tint" + color: "$success") — that pair is AA by construction in both themes, and the dark layer re-states every tint. Writes the light system to exactly ONE of canvasId / projectId / workspaceId. Canvas scope honors the inherited-design-system contract (tokens the canvas inherits from workspace/project are PRESERVED and reported, same as apply_preset — pass them explicitly via set_variables if you want the generated values). Raise your palette floor: generate first, then adjust individual tokens — don't eyeball ten hexes.`,
+The DARK theme ships in the same call (the Radix pattern: a reversed walk of the same ramps, not inverted hex): the semantic dark mapping is WRITTEN to the layer's dark.colors override — so theme: "dark" on screenshot/export renders it and canvas_evaluate contrast-checks BOTH themes from then on. Status colors get a SECOND pass for dark: the light-tuned success/warning/danger are re-lit (hue held) until each clears AA against the lightest dark surface (bg-elevated) too, so a $danger message reads in both themes. Phase 28 adds THE COLOR RANGE in the same call: chart-1…chart-6 categorical series tokens (a deterministic hue walk from the seed, ≥ 30° apart, each clearing the 3:1 graphical-object floor on BOTH themes' surfaces — reference them from chart segments/series and legend dots) and the TINT LAYER — accent-tint / success-tint / warning-tint / danger-tint / neutral-tint: soft same-hue surfaces for status chips, icon tiles, pill badges, and initials avatars. The pairing rule is one sentence: tint as the FILL, its base color as the INK (fill: "$success-tint" + color: "$success") — that pair is AA by construction in both themes, and the dark layer re-states every tint. Writes the light system to exactly ONE of canvasId / projectId / workspaceId. Canvas scope honors the inherited-design-system contract: tokens the canvas inherits from workspace/project are PRESERVED and reported — ordinary ones under \`preservedFromDesignSystem\`, and ones in the semantic vocabulary this call defines under \`designSystemConflicts\` (an inherited \`border\` or \`text-primary\` on a freshly generated palette means two color languages on one screen; each entry names the fix). Take the generated value with set_variables, or pass \`preserveInherited: false\` to write the palette whole. Raise your palette floor: generate first, then adjust individual tokens — don't eyeball ten hexes.`,
   {
     seed: z.string().describe('The brand color to derive everything from (#RRGGBB)'),
     canvasId: z.string().optional().describe('Write to this canvas\'s variables'),
     projectId: z.string().optional().describe('Write to this project\'s design system'),
     workspaceId: z.string().optional().describe('Write to this workspace\'s design system'),
+    preserveInherited: z.boolean().optional().describe('Canvas scope only. Default true: a token the canvas resolves through an inherited design system is kept (reported under preservedFromDesignSystem / designSystemConflicts) instead of being overwritten. Pass false to write the generated language WHOLE — the right call when you want this canvas to BE the new system rather than a blend of two.'),
   },
-  async ({ seed, canvasId, projectId, workspaceId }) => {
+  async ({ seed, canvasId, projectId, workspaceId, preserveInherited }) => {
     const targets = [canvasId, projectId, workspaceId].filter(Boolean);
     if (targets.length !== 1) {
       return { content: [{ type: 'text', text: 'Error: pass exactly ONE of canvasId / projectId / workspaceId — the layer the system is written to.' }], isError: true };
@@ -1017,7 +1018,7 @@ The DARK theme ships in the same call (the Radix pattern: a reversed walk of the
       for (const [step, hex] of Object.entries(system.neutral)) colors[`neutral-${step}`] = hex;
       Object.assign(colors, system.status, system.light, system.categorical, system.tints);
 
-      let preserved: Array<{ category: string; key: string; kept: string; preset: string }> = [];
+      let preserved: PresetApplyResult['preserved'] = [];
       let overwrote: string[] = [];
       let wroteTo: Record<string, string>;
       if (canvasId) {
@@ -1025,7 +1026,7 @@ The DARK theme ships in the same call (the Radix pattern: a reversed walk of the
         const canvas = getCanvas(canvasId);
         if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
         overwrote = Object.keys(colors).filter((k) => canvas.variables.colors?.[k] !== undefined);
-        const merge = applyPresetTokens(canvas, { colors }, getInheritedTokens(canvas));
+        const merge = applyPresetTokens(canvas, { colors }, getInheritedTokens(canvas), { preserveInherited });
         preserved = merge.preserved;
         setVariables(canvas, { dark: { colors: { ...system.dark, ...system.darkRange } } });
         touchCanvas(canvasId);
@@ -1046,6 +1047,17 @@ The DARK theme ships in the same call (the Radix pattern: a reversed walk of the
         wroteTo = { layer: 'workspace', id: workspaceId! };
       }
 
+      // Phase 29 FR-B2 — same contract as generate_design_system: an inherited
+      // value for a token in the semantic vocabulary THIS call defines is a
+      // conflict, not a footnote. Everything else stays a plain preservation.
+      const ownedColors = new Set(Object.keys(system.light));
+      const csConflicts = preserved.filter((e) => e.category === 'colors' && ownedColors.has(e.key)).map((e) => ({
+        ...e,
+        why: `"${e.key}" is part of the semantic vocabulary this system defines — an inherited value here mixes two color languages on one screen.`,
+        fix: `set_variables on this canvas to take the generated value (${e.preset}), or re-run with preserveInherited: false.`,
+      }));
+      const csPlain = preserved.filter((e) => !(e.category === 'colors' && ownedColors.has(e.key)));
+
       return { content: [{ type: 'text', text: JSON.stringify({
         wroteTo,
         seed: system.seed,
@@ -1057,7 +1069,8 @@ The DARK theme ships in the same call (the Radix pattern: a reversed walk of the
         tints: system.tints,
         dark: system.dark,
         ...(system.rangeNote ? { rangeNote: system.rangeNote } : {}),
-        ...(preserved.length ? { preservedFromDesignSystem: preserved } : {}),
+        ...(csPlain.length ? { preservedFromDesignSystem: csPlain } : {}),
+        ...(csConflicts.length ? { designSystemConflicts: csConflicts } : {}),
         ...(overwrote.length ? { overwrote } : {}),
         note: 'Light system + dark override layer written. Reference tokens as $primary-600, $bg-surface, $accent, … (the semantic names are the same vocabulary the structure scaffolds use); render the dark theme with theme: "dark" on screenshot/export — canvas_evaluate now contrast-checks both themes automatically.',
       }, null, 2) }] };
@@ -1078,7 +1091,7 @@ Personalities (required — pick a stance, don't default into sameness):
 - "soft" — warm, rounded, human (Plus Jakarta Sans + Inter, 12/16/20 radii, springy motion). For consumer apps, onboarding, anything friendly.
 - "data-dense" — instrument-panel density (Inter + a JetBrains Mono "figures" role, 13px pivot, minimal radii, near-flat depth). For dashboards, tables, monitoring.
 
-The typography layer ships ROLE tokens the structures speak — $display / $heading / $title (page/screen titles, one step below $display — every archetype's page title references it) / $body / $label / $caption (+ $figures when a mono face exists) — alongside the text-xs…text-3xl steps. Depth: reference elevation from any node as shadow: "$elevation.flat|raised|floating|overlay" — the dark layer re-states each depth so it reads on dark surfaces. The COLOR RANGE rides along (Phase 28): $chart-1…$chart-6 categorical series tokens for dataviz, and the tint layer ($accent-tint / $success-tint / … — tint as fill, base color as ink, AA by construction both themes) for chips, icon tiles, pills, and avatars. Writes to exactly ONE of canvasId / projectId / workspaceId; canvas scope preserves inherited design-system tokens (reported, same contract as generate_color_system). The two single-purpose generators stay available for targeted regeneration (just the palette, just the scale).`,
+The typography layer ships ROLE tokens the structures speak — $display / $heading / $title (page/screen titles, one step below $display — every archetype's page title references it) / $body / $label / $caption (+ $figures when a mono face exists) — alongside the text-xs…text-3xl steps. Depth: reference elevation from any node as shadow: "$elevation.flat|raised|floating|overlay" — the dark layer re-states each depth so it reads on dark surfaces. The COLOR RANGE rides along (Phase 28): $chart-1…$chart-6 categorical series tokens for dataviz, and the tint layer ($accent-tint / $success-tint / … — tint as fill, base color as ink, AA by construction both themes) for chips, icon tiles, pills, and avatars. Writes to exactly ONE of canvasId / projectId / workspaceId. Canvas scope keeps tokens the canvas resolves through an inherited design system rather than clobbering them — but preservation is FIELD-WISE for typography, so an inherited role that carries only a size keeps that size and still picks up this personality's family/weight/tracking (before v2.1 it swallowed the whole spec and the role silently rendered in the fallback stack). What was kept is reported two ways: \`preservedFromDesignSystem\` for ordinary tokens, and \`designSystemConflicts\` for tokens in the semantic vocabulary THIS system defines (bg-surface, text-primary, border, accent, the type roles) — a conflict means the screen is running two design languages at once, and each entry names the fix. \`preserveInherited: false\` writes the generated language whole. The response's typographyRoles reports what the canvas ACTUALLY resolves, not what was generated — the two differ exactly when preservation fired. The two single-purpose generators stay available for targeted regeneration (just the palette, just the scale).`,
   {
     seed: z.string().describe('The brand color to derive everything from (#RRGGBB)'),
     personality: z.enum(['technical', 'editorial', 'soft', 'data-dense']).describe('The design stance — required. Genre guide: dashboards → data-dense or technical; marketing/content → editorial; consumer → soft.'),
@@ -1087,8 +1100,10 @@ The typography layer ships ROLE tokens the structures speak — $display / $head
     canvasId: z.string().optional().describe('Write to this canvas\'s variables'),
     projectId: z.string().optional().describe('Write to this project\'s design system'),
     workspaceId: z.string().optional().describe('Write to this workspace\'s design system'),
+    preserveInherited: z.boolean().optional()
+      .describe('Canvas scope only. Default true: a token the canvas resolves through an inherited design system is kept (reported under preservedFromDesignSystem / designSystemConflicts) instead of being overwritten. Pass false to write the generated language WHOLE — the right call when you want this canvas to BE the new system rather than a blend of two.'),
   },
-  async ({ seed, personality, baseSize, ratio, canvasId, projectId, workspaceId }) => {
+  async ({ seed, personality, baseSize, ratio, canvasId, projectId, workspaceId, preserveInherited }) => {
     const targets = [canvasId, projectId, workspaceId].filter(Boolean);
     if (targets.length !== 1) {
       return { content: [{ type: 'text', text: 'Error: pass exactly ONE of canvasId / projectId / workspaceId — the layer the system is written to.' }], isError: true };
@@ -1097,13 +1112,13 @@ The typography layer ships ROLE tokens the structures speak — $display / $head
       const system = generateDesignSystem(seed, personality as PersonalityName, { baseSize, ratio });
       const vars = system.variables;
 
-      let preserved: Array<{ category: string; key: string; kept: string; preset: string }> = [];
+      let preserved: PresetApplyResult['preserved'] = [];
       let wroteTo: Record<string, string>;
       if (canvasId) {
         ensureFresh(canvasId);
         const canvas = getCanvas(canvasId);
         if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
-        const merge = applyPresetTokens(canvas, { colors: vars.colors, spacing: vars.spacing, radius: vars.radius, typography: vars.typography }, getInheritedTokens(canvas));
+        const merge = applyPresetTokens(canvas, { colors: vars.colors, spacing: vars.spacing, radius: vars.radius, typography: vars.typography }, getInheritedTokens(canvas), { preserveInherited });
         preserved = merge.preserved;
         setVariables(canvas, { elevation: vars.elevation, motion: vars.motion, dark: vars.dark });
         touchCanvas(canvasId);
@@ -1122,6 +1137,31 @@ The typography layer ships ROLE tokens the structures speak — $display / $head
 
       const fontsContent = await warmFontsContent({ typography: vars.typography });
 
+      // Phase 29 FR-B2 — the generator OWNS a semantic vocabulary: the surface /
+      // ink / border / accent colors and the type roles the structures speak.
+      // Keeping an inherited value for one of those isn't a harmless
+      // preservation, it stitches two design systems together — the attempt
+      // inherited a near-black \`border\` onto a light-green system and every
+      // hairline would have been a hard rule. Report those separately, with the
+      // fix named, instead of burying them in a list an agent skims.
+      const ownedColors = new Set(Object.keys(system.colorSystem.light));
+      const ownedRoles = new Set(['display', 'heading', 'title', 'body', 'label', 'caption', 'figures']);
+      const owns = (e: { category: string; key: string }) =>
+        (e.category === 'colors' && ownedColors.has(e.key)) || (e.category === 'typography' && ownedRoles.has(e.key));
+      const conflicts = preserved.filter(owns).map((e) => ({
+        ...e,
+        why: e.category === 'colors'
+          ? `"${e.key}" is part of the semantic vocabulary this system defines — an inherited value here mixes two design languages on one screen.`
+          : `"${e.key}" is a type role this personality defines${e.filledFromPreset?.length ? ` — the inherited spec was partial, so ${e.filledFromPreset.join('/')} came from the generated role` : ''}.`,
+        fix: `set_variables on this canvas to take the generated value (${e.preset}), or re-run with preserveInherited: false to write the whole language.`,
+      }));
+      const plain = preserved.filter((e) => !owns(e));
+
+      // Report what the canvas ACTUALLY resolves, not what was generated — the
+      // two diverge exactly when preservation fired, which is when an agent
+      // most needs the truth.
+      const resolvedRoles = (canvasId ? getCanvasTokens(getCanvas(canvasId)!).typography : vars.typography) ?? {};
+
       return { content: [
         { type: 'text', text: JSON.stringify({
           wroteTo,
@@ -1130,11 +1170,12 @@ The typography layer ships ROLE tokens the structures speak — $display / $head
           fonts: system.fonts,
           seed: system.colorSystem.seed,
           semantics: system.colorSystem.light,
-          typographyRoles: { display: vars.typography!['display'], heading: vars.typography!['heading'], title: vars.typography!['title'], body: vars.typography!['body'], label: vars.typography!['label'] },
+          typographyRoles: { display: resolvedRoles['display'], heading: resolvedRoles['heading'], title: resolvedRoles['title'], body: resolvedRoles['body'], label: resolvedRoles['label'] },
           radius: vars.radius,
           elevation: Object.keys(vars.elevation ?? {}),
           motion: Object.keys(vars.motion ?? {}),
-          ...(preserved.length ? { preservedFromDesignSystem: preserved } : {}),
+          ...(plain.length ? { preservedFromDesignSystem: plain } : {}),
+          ...(conflicts.length ? { designSystemConflicts: conflicts } : {}),
           note: 'Full design language written: reference $display/$heading/$title/$body/$label typography roles, $bg-surface/$accent/… colors, shadow: "$elevation.raised" for depth, transition: "$motion.base" for timing. Render dark with theme: "dark" — colors AND elevation re-state themselves. Same seed with a different personality gives a visibly different product.',
         }, null, 2) },
         ...fontsContent,
@@ -1450,7 +1491,7 @@ Scaffolds reference $space-*/$radius-*/$elevation.*/$title tokens for spacing, c
 // --- apply_preset ---
 server.tool(
   'apply_preset',
-  "Apply a style guide preset to a canvas. Merges the preset's design tokens into the canvas variables and copies in any reusable components (button, card, badge) the preset defines. Tokens the canvas inherits from the workspace/project design system are preserved (and reported as `preservedFromDesignSystem`) instead of being silently overwritten — set them explicitly with set_variables if you want the preset's values.",
+  "Apply a style guide preset to a canvas. Merges the preset's design tokens into the canvas variables and copies in any reusable components (button, card, badge) the preset defines. Tokens the canvas inherits from the workspace/project design system are preserved (and reported as \`preservedFromDesignSystem\`) instead of being silently overwritten — set them explicitly with set_variables if you want the preset's values.",
   {
     canvasId: z.string().describe('Canvas ID'),
     preset: z.string().describe('Preset name (dark, light, material, minimal)'),

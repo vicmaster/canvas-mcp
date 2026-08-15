@@ -190,8 +190,17 @@ export function getVariables(canvas: Canvas): DesignVariables {
 
 export interface PresetApplyResult {
   variables: DesignVariables;
-  /** Tokens left to inheritance instead of being overwritten by the preset. */
-  preserved: Array<{ category: string; key: string; kept: string; preset: string }>;
+  /** Tokens left to inheritance instead of being overwritten by the preset.
+   * `filledFromPreset` names the sub-fields the preset contributed to a
+   * partially-specified token (Phase 29 FR-B1) — when present, the canvas got a
+   * MERGED value rather than pure inheritance. */
+  preserved: Array<{ category: string; key: string; kept: string; preset: string; filledFromPreset?: string[] }>;
+}
+
+export interface PresetApplyOptions {
+  /** Phase 29 FR-B3 — write every preset token, ignoring inheritance. A caller
+   * asking for a whole new design language usually means it. */
+  preserveInherited?: boolean;
 }
 
 /** Apply a preset's tokens to a canvas WITHOUT silently clobbering tokens the
@@ -206,6 +215,7 @@ export function applyPresetTokens(
   canvas: Canvas,
   presetVars: Partial<DesignVariables>,
   inherited: DesignVariables,
+  options: PresetApplyOptions = {},
 ): PresetApplyResult {
   const preserved: PresetApplyResult['preserved'] = [];
   const cats = ['colors', 'spacing', 'radius', 'typography'] as const;
@@ -218,14 +228,45 @@ export function applyPresetTokens(
     for (const [key, val] of Object.entries(pv)) {
       const hasOwn = own[key] !== undefined;
       const inhVal = inh[key];
-      if (!hasOwn && inhVal !== undefined && !tokenEquals(inhVal, val)) {
-        preserved.push({ category: cat, key, kept: fmtToken(cat, inhVal), preset: fmtToken(cat, val) });
+      if (options.preserveInherited === false || hasOwn || inhVal === undefined || tokenEquals(inhVal, val)) {
+        own[key] = val;
         continue;
       }
-      own[key] = val;
+
+      // Phase 29 FR-B1 — a token is not all-or-nothing. An inherited typography
+      // token that carries only a size ({ fontSize: 13 }) used to shadow the
+      // preset's whole spec, so the role kept the inherited size AND silently
+      // lost the personality's fontFamily/weight/tracking — it still resolved,
+      // so nothing errored, and the text rendered in the fallback stack. Merge
+      // field-wise instead: inherited fields win, the preset fills the gaps.
+      const merged = mergeTokenFields(inhVal, val);
+      if (merged) {
+        own[key] = merged.value;
+        preserved.push({ category: cat, key, kept: fmtToken(cat, inhVal), preset: fmtToken(cat, val), filledFromPreset: merged.filled });
+        continue;
+      }
+
+      preserved.push({ category: cat, key, kept: fmtToken(cat, inhVal), preset: fmtToken(cat, val) });
     }
   }
   return { variables: canvas.variables, preserved };
+}
+
+/** Field-wise merge of a partially-specified inherited token over a fully
+ * specified preset one. Inherited fields win (the design system set them on
+ * purpose); the preset contributes only what inheritance left undefined.
+ * Returns null when there is nothing to contribute — the inherited token is
+ * complete, or either side isn't a plain object — so the caller falls back to
+ * plain preservation. */
+function mergeTokenFields(inhVal: unknown, presetVal: unknown): { value: Record<string, unknown>; filled: string[] } | null {
+  if (!isPlainRecord(inhVal) || !isPlainRecord(presetVal)) return null;
+  const filled = Object.keys(presetVal).filter((f) => inhVal[f] === undefined);
+  if (filled.length === 0) return null;
+  return { value: { ...presetVal, ...inhVal }, filled };
+}
+
+function isPlainRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 function tokenEquals(a: unknown, b: unknown): boolean {

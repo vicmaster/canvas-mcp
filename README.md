@@ -441,8 +441,17 @@ The headline call for a new project's look: **one seed color + one personality �
 | `personality` | string | **Required** — `technical`, `editorial`, `soft`, or `data-dense`. Dashboards → `data-dense`/`technical`, marketing/content → `editorial`, consumer → `soft` |
 | `baseSize` / `ratio` | number? | Override the personality's type pivot / scale ratio |
 | `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
+| `preserveInherited` | boolean? | Canvas scope only. Default `true` — see "Inherited tokens" below. Pass `false` to write the generated language whole. |
 
 Same seed, different personality = a visibly different product. The two single-purpose generators below stay for targeted regeneration (just the palette, just the scale).
+
+**Inherited tokens (canvas scope).** A token the canvas already resolves through an inherited workspace/project design system is kept instead of silently overwritten, and reported back so you can act on it rather than guess:
+
+- `preservedFromDesignSystem` — ordinary preserved tokens. For typography, preservation is **field-wise**: an inherited token that's only partially specified (e.g. `{ fontSize: 13 }`) is merged with the generated role rather than shadowing it whole, so the personality's `fontFamily`/`fontWeight`/`tracking` still land; the entry's `filledFromPreset` names which fields the preset contributed. A fully-specified inherited token is preserved as-is.
+- `designSystemConflicts` — preservations that land on a token in the semantic vocabulary this call itself defines (`bg-surface`, `text-primary`, `border`, `accent`, and the type roles). Keeping an inherited value there means two design languages on one screen — e.g. a near-black `border` surviving onto a freshly generated light-green system. Each entry adds `why` and `fix`.
+- Pass `preserveInherited: false` to skip all of this and write the generated language whole (the right call when this canvas should *be* the new system, not a blend of two). The response's `typographyRoles` always reports what the canvas actually resolves, which differs from the generated values exactly when preservation fired.
+
+Same contract, same field names, as `apply_preset` and `generate_color_system`.
 
 ### `generate_color_system`
 
@@ -459,8 +468,9 @@ One seed color → a full perceptual color system, written to the workspace / pr
 |-------|------|-------------|
 | `seed` | string | The brand color everything derives from (`#RRGGBB`) |
 | `canvasId` / `projectId` / `workspaceId` | string? | Exactly one — the token layer written to |
+| `preserveInherited` | boolean? | Canvas scope only. Default `true` — see "Inherited tokens" under `generate_design_system` above. Pass `false` to write the generated palette whole. |
 
-The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. The status colors get a second pass here too: the light-tuned `success`/`warning`/`danger` are re-lit (hue held) until each clears AA against `bg-elevated` (the lightest dark surface — the stricter target), so a `$danger` message reads in both themes. The categorical and tint layers get dark counterparts too (`dark.colors` carries `chart-1`…`chart-6` and the `-tint` tokens re-lit for the dark surfaces), written in the same call. Canvas scope honors the inherited-design-system contract (`preservedFromDesignSystem`, same as `apply_preset`).
+The **dark theme ships in the same call**: the semantic dark mapping (Radix pattern: a reversed walk of the same ramps, AA-checked against its own surfaces) is written to the layer's `dark.colors` override — `theme: "dark"` on screenshot/export renders it, and `canvas_evaluate` contrast-checks both themes from then on. The status colors get a second pass here too: the light-tuned `success`/`warning`/`danger` are re-lit (hue held) until each clears AA against `bg-elevated` (the lightest dark surface — the stricter target), so a `$danger` message reads in both themes. The categorical and tint layers get dark counterparts too (`dark.colors` carries `chart-1`…`chart-6` and the `-tint` tokens re-lit for the dark surfaces), written in the same call. Canvas scope honors the inherited-design-system contract, same as `apply_preset` and `generate_design_system`: ordinary preservations report as `preservedFromDesignSystem`, and a preserved value that lands on a token this call's own semantic vocabulary (`bg-surface`/`text-primary`/`border`/`accent`) reports as `designSystemConflicts` with a `why`/`fix` instead.
 
 ### `get_variables` / `set_variables`
 
@@ -545,7 +555,7 @@ List available style guide presets. No params. Returns preset names and descript
 
 ### `apply_preset`
 
-Apply a style guide preset to a canvas. Merges preset design tokens into the canvas variables, and copies in any reusable components (`button`, `card`, `badge`) the preset defines so they can be instanced. The preset is also recorded in the canvas provenance + per-project build log.
+Apply a style guide preset to a canvas. Merges preset design tokens into the canvas variables, and copies in any reusable components (`button`, `card`, `badge`) the preset defines so they can be instanced. The preset is also recorded in the canvas provenance + per-project build log. Tokens the canvas already resolves through an inherited workspace/project design system are kept rather than overwritten and reported as `preservedFromDesignSystem` — for typography this merge is field-wise (a partially-specified inherited token, e.g. just `fontSize`, is filled out with the preset's other fields rather than shadowing the whole role); set them explicitly with `set_variables` if you want the preset's values instead.
 
 | Param | Type | Description |
 |-------|------|-------------|
