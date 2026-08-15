@@ -527,6 +527,18 @@ The reference-caliber attempt (2026-08-10) proved today's toolkit reaches a top-
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-28-SPEC.md`](docs/specs/PHASE-28-SPEC.md). All slices shipped — Phase 28 complete: the reference attempt re-ran with every workaround deleted at score 95 in BOTH themes (the first attempt had no dark story at all), and the diff between the two attempt scripts is the phase's changelog._
 
+### Phase 29 — Commerce fluency (v2.1)
+
+The checkout attempt (2026-08-15) asked whether v2.0.0 holds on a screen type deliberately unlike a dashboard. It reached score 97 with a clean stress run — but only by declaring `genre: "dashboard"` on a checkout page (77 without it; that one tell was the whole gap), after hand-repairing a generated design system that had been overruled by inherited tokens, and after fixing scaffold font sizes that were never on the generated scale. This phase turns each workaround into vocabulary and retires the advisories that cannot be acted on. Acceptance is literal: the checkout re-run with no dodges at ≥ 95, light and dark.
+
+- [ ] Slice A — commerce vocabulary: a `commerce` genre relaxing `honest-content` for transactional screens (scoped away from marketing pages), plus a retail-copy guard so "30-day guarantee" stops reading as a section-number eyebrow
+- [ ] Slice B — generator preservation: field-wise typography merge so a preserved size never drops the personality's face, contrast-aware colour preservation, and an explicit opt-out
+- [ ] Slice C — scaffolds on the system: every structure references type roles instead of literal pixel sizes, every component scaffold survives long-text and i18n, and one regression test stamps them all
+- [ ] Slice D — advisory honesty: the unsatisfiable sibling-padding check scoped or removed, spacing variety recalibrated, and the directive no longer withholding readiness when nothing blocking remains
+- [ ] Slice E — renderer and capture: the oversized-artboard duplicate band, `responsive: "fixed"` implemented or withdrawn, and a way to capture a design taller than its artboard
+
+_Full spec-driven breakdown in [`docs/specs/PHASE-29-SPEC.md`](docs/specs/PHASE-29-SPEC.md). Deliberately out of scope: a checkout archetype and a product-image primitive (craft work that belongs on top of a correct evaluator), and flow-shaped state coverage (a larger design question)._
+
 ### Issue-driven improvements (post-v1.8)
 
 - [x] `replace_matching_properties` — bulk property edit: apply one `set` to every node matching a property/value predicate (AND across keys, token refs match literally, structured values by shape) with `scope`/`type` filters and a `dryRun` preview; ends the one-`U()`-per-node grind for wide changes (issue #127)
