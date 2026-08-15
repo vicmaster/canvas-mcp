@@ -400,6 +400,60 @@ page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
 I(page, {type:"text", content:"Ship designs your team approves", fontSize:32})
 I(page, {type:"text", content:"Pricing — placeholder", fontSize:16})`);
   assert(tells(await cliche(clean), 'slop-copy').length === 0, 'branded copy + labeled placeholder do not flag');
+
+  // Phase 29 slice A (#194) — a numeral bound to a unit noun by a TIGHT hyphen
+  // is a compound modifier, not a section-number eyebrow. The checkout attempt
+  // had "30-day plant guarantee" flagged and reworded to dodge it.
+  const retail = build('retail-copy', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+I(page, {type:"text", content:"30-day plant guarantee", fontSize:14})
+I(page, {type:"text", content:"2-year warranty included", fontSize:14})
+I(page, {type:"text", content:"24/7 support", fontSize:14})
+I(page, {type:"text", content:"12-month plan", fontSize:14})
+I(page, {type:"text", content:"90-day returns", fontSize:14})`);
+  assert(tells(await cliche(retail), 'slop-copy').length === 0, 'compound modifiers (30-day, 2-year, 24/7) are retail copy, not eyebrows');
+
+  // ...and the real eyebrow shapes still fire, including the SPACED hyphen.
+  const eyebrows = build('numbered-eyebrows', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+I(page, {type:"text", content:"01 — Introduction", fontSize:12})
+I(page, {type:"text", content:"02 / Process", fontSize:12})
+I(page, {type:"text", content:"3. Overview", fontSize:12})
+I(page, {type:"text", content:"04 - Results", fontSize:12})`);
+  assert(tells(await cliche(eyebrows), 'slop-copy').length === 4, 'numbered eyebrows still flag — em dash, slash, dot, and spaced hyphen');
+}
+
+// --- Phase 29 slice A (#194): the evaluator knows transactional commerce ---
+async function testCommerceGenre() {
+  console.log('\n── Phase 29: commerce genre ──');
+  // A checkout's own money: line prices, subtotal, credit, total.
+  const checkout = build('checkout', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+I(page, {type:"text", content:"$76.00", fontSize:16})
+I(page, {type:"text", content:"$38.00 each", fontSize:13})
+I(page, {type:"text", content:"Subtotal $142.00", fontSize:16})
+I(page, {type:"text", content:"$40.00 available", fontSize:13})
+I(page, {type:"text", content:"Total $94.40", fontSize:20})`);
+  assert(tells(await cliche(checkout), 'honest-content').length > 0, 'without a genre, a checkout price list flags as fabricated');
+  assert(tells(await cliche(checkout, 'commerce'), 'honest-content').length === 0, 'genre:"commerce" relaxes the money on a transactional screen');
+  assert(tells(await cliche(checkout, 'checkout'), 'honest-content').length === 0, '"checkout" is an alias of commerce');
+
+  // The genre report folds the alias away and still offers the tradeoff.
+  const report = (await evaluateCanvas(checkout, { mode: 'fast', categories: ['cliche'], genre: 'commerce' })).genre;
+  assert(report?.active === 'commerce' && report.relaxed.includes('honest-content'), 'genre report names commerce and what it relaxed');
+  const offered = (await evaluateCanvas(checkout, { mode: 'fast', categories: ['cliche'] })).genre;
+  const byTell = offered?.notRelaxed.find((n) => n.tell === 'honest-content');
+  assert(!!byTell && byTell.relaxedBy.includes('commerce') && !byTell.relaxedBy.includes('checkout'),
+    'notRelaxed offers "commerce" as a canonical option, never the alias');
+
+  // The guardrail still holds: commerce does not license invented social proof.
+  const marketing = build('marketing', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16})
+I(page, {type:"text", content:"Trusted by 12,000 teams", fontSize:16})
+I(page, {type:"text", content:"— Jane Doe, CEO", fontSize:14})
+I(page, {type:"text", content:"99.9% uptime", fontSize:16})`);
+  const marketingIssues = await cliche(marketing, 'commerce');
+  assert(marketingIssues.length > 0, 'genre:"commerce" does not clear a marketing page of fabricated social proof');
 }
 
 // --- FR-9: radius consistency ---
@@ -475,6 +529,7 @@ async function main() {
   await testAccentConsistency();
   await testCleanAndCategory();
   await testAutofixSurfacing();
+  await testCommerceGenre();
   await testDashboardVocabulary();
   await testMicroPatternScaffolds();
 

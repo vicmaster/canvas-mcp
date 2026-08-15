@@ -58,7 +58,10 @@ t=I(card, { type: "text", content: "Revenue targets", fontSize: 20, fontWeight: 
   check('provenance material → active/source', r.genre!.active === 'material' && r.genre!.source === 'provenance');
   check('material relaxes accent-hue + pure-black-white', r.genre!.relaxed.sort().join(',') === 'accent-hue,pure-black-white');
   const byTell = Object.fromEntries(r.genre!.notRelaxed.map((n) => [n.tell, n.relaxedBy]));
-  check('honest-content not relaxed, dashboard would', (byTell['honest-content'] ?? []).join(',') === 'dashboard');
+  // Phase 29 slice A — two genres now relax honest-content, and the report
+  // offers both canonical names (never the `data` / `checkout` aliases).
+  check('honest-content not relaxed; dashboard and commerce would',
+    (byTell['honest-content'] ?? []).slice().sort().join(',') === 'commerce,dashboard');
 }
 
 // An explicit genre overrides the stamp.
