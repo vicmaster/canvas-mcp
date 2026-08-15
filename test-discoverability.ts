@@ -135,6 +135,52 @@ const guidelines = readFileSync('docs/GUIDELINES.md', 'utf-8');
     expect(`genre-report field "${field}" documented in src/index.ts`, indexSrc.includes(field));
     expect(`genre-report field "${field}" documented in GUIDELINES`, guidelines.includes(field));
   }
+
+  // Phase 29 — "named somewhere" is too weak a guard. When TWO genres relax the
+  // same tell, a passage that offers one and not the other is worse than one
+  // that offers neither: it reads as the complete answer. That is exactly how
+  // the commerce genre shipped missing from the canvas_autofix README row while
+  // the near-identical canvas_evaluate row above it was correct.
+  //
+  // The invariant: for any tell relaxed by more than one canonical genre, every
+  // LINE that names one of them as a genre must name all of them. Scoped per
+  // tell so unrelated genres aren't dragged in (a fabricated-content passage has
+  // no reason to mention "material", which relaxes different tells), and keyed
+  // on quoted/backticked mentions so prose like "dashboard vocabulary" — which
+  // describes a style, not a genre value — stays exempt.
+  const aliasBlock = evaluateSrc.match(/const GENRE_ALIASES[^=]*=\s*new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? '';
+  const aliases = new Set([...aliasBlock.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  const canonical = genres.filter((g) => !aliases.has(g));
+  expect('genre aliases parsed from evaluate.ts', aliases.size > 0, [...aliases].join(', '));
+
+  const tellToGenres = new Map<string, string[]>();
+  for (const g of canonical) {
+    const tells = table.match(new RegExp(`^\\s{2}${g}:\\s*\\[([^\\]]*)\\]`, 'm'))?.[1] ?? '';
+    for (const t of [...tells.matchAll(/'([^']+)'/g)].map((m) => m[1])) {
+      tellToGenres.set(t, [...(tellToGenres.get(t) ?? []), g]);
+    }
+  }
+  const shared = [...tellToGenres.entries()].filter(([, gs]) => gs.length > 1);
+  expect('at least one tell is relaxed by 2+ genres (guard has something to check)', shared.length > 0,
+    shared.map(([t, gs]) => `${t}: ${gs.join('+')}`).join('; '));
+
+  // A line counts as a genre passage only if it TALKS about genre — `dashboard`
+  // is also a page-scaffold name, and the structures list in the README is not
+  // an incomplete genre enumeration.
+  const named = (line: string, g: string) => new RegExp(`[\`"]${g}[\`"]`).test(line);
+  const aboutGenre = (line: string) => /genre/i.test(line);
+  for (const [tell, gs] of shared) {
+    const offenders: string[] = [];
+    for (const [label, src] of [['src/index.ts', indexSrc], ['GUIDELINES', guidelines], ['README', readme]] as const) {
+      src.split('\n').forEach((line, i) => {
+        if (!aboutGenre(line)) return;
+        const present = gs.filter((g) => named(line, g));
+        if (present.length === 0 || present.length === gs.length) return;
+        offenders.push(`${label}:${i + 1} names ${present.join('/')} but not ${gs.filter((g) => !present.includes(g)).join('/')}`);
+      });
+    }
+    expect(`every passage offering a "${tell}" genre offers all of them`, offenders.length === 0, offenders.join(' | '));
+  }
 }
 
 // ── 8. gate-integrity vocabulary is surfaced where agents look ───────────────
