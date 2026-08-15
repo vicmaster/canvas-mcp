@@ -303,7 +303,7 @@ Polishing the design to the bar is **your** job, not the user's — they should 
 
 `canvas_evaluate`'s result includes a `directive` field — it says `READY TO PRESENT` or `NOT READY` with what's left. **Only present a design once it says READY.** Don't ship the first attempt; ship the one that passes the bar.
 
-**Which number is the gate?** The heuristic directive (fast mode) is the presentation gate — always available, no API key. `mode: "llm"` adds a vision-model rubric critique (composition, hierarchy, polish) on top; it needs `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and degrades gracefully without one — when it's unavailable, the heuristic directive alone decides. And calibrate the evaluator to what the screen *is*: a data-dense product screen evaluated without `genre: "dashboard"` will flag its own figures as fabricated and pin the score below the bar with no path up — that's a miscalibrated gate, not a bad design (see Cliché & craft below).
+**Which number is the gate?** The heuristic directive (fast mode) is the presentation gate — always available, no API key. `mode: "llm"` adds a vision-model rubric critique (composition, hierarchy, polish) on top; it needs `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and degrades gracefully without one — when it's unavailable, the heuristic directive alone decides. And calibrate the evaluator to what the screen *is*: a data-dense product screen evaluated without `genre: "dashboard"` — or a checkout without `genre: "commerce"` — will flag its own figures as fabricated and pin the score below the bar with no path up — that's a miscalibrated gate, not a bad design (see Cliché & craft below).
 
 ## Cliché & craft
 

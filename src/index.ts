@@ -137,6 +137,12 @@ const GOTCHAS = [
   'Gate integrity: a canvas describing a SHIPPED view is a contract — run canvas_check_drift against the live route BEFORE designing on it (findings: missing-in-page / missing-in-canvas / control-mismatch / table-mismatch), and reconcile deliberately: update the canvas, flag the implementation, or ask — never silently annotate a difference. canvas_sync_from_url answers "how much does it LOOK different" (pixel %); canvas_version makes approvals falsifiable — record { canvasId, versionHash } at approval time and check with expectedHash later (metadata/feedback never moves the hash). CI can demand both: npx framesmith check-drift / verify exit 1 on failure.',
 ];
 
+/** Shared by the canvas_evaluate and canvas_autofix `genre` params. One
+ * string, because two near-identical copies is how a genre ends up
+ * documented on one tool and not the other (Phase 29 slice A shipped that
+ * bug into the README; test-discoverability now guards the doc surfaces). */
+const GENRE_PARAM_DOC = 'Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens; "commerce" (alias "checkout") allows the money on a transactional screen — cart, checkout, order confirmation, billing history (both relax honest-content). Defaults to the canvas provenance preset if stamped (canvas_set_genre stamps it durably, no token churn). Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; a screen you complete a purchase on is "commerce"; editors and admin forms are "material"; a PRICING page is marketing and gets none of them. The result\'s genre field shows what the choice did.';
+
 const GUIDELINES_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'GUIDELINES.md');
 
 /** Phase 11 — the advisory diversification signal for a project: the last 5
@@ -1928,7 +1934,7 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
       .optional()
       .describe('Specific categories to evaluate (default: all)'),
     genre: z.string().optional()
-      .describe('Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens; "commerce" (alias "checkout") allows the money on a transactional screen — cart, checkout, order confirmation, billing history (both relax honest-content). Defaults to the canvas provenance preset if stamped (canvas_set_genre stamps it durably, no token churn). Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; a screen you complete a purchase on is "commerce"; editors and admin forms are "material"; a PRICING page is marketing and gets none of them. The result\'s genre field shows what the choice did.'),
+      .describe(GENRE_PARAM_DOC),
     floor: z.number().min(1).max(5).optional()
       .describe('llm mode only: per-axis rubric floor (1-5). Any axis below it sets needsRevision. Default 3 (or FRAMESMITH_CRITIQUE_FLOOR).'),
   },
@@ -2000,7 +2006,7 @@ server.tool(
       .optional()
       .describe('Restrict to fixes from these categories (default: all)'),
     genre: z.string().optional()
-      .describe('Genre/style that relaxes specific cliche gates — "material" allows purple accents and white elevated surfaces; "dashboard" (alias "data") allows realistic figures on data-dense product screens; "commerce" (alias "checkout") allows the money on a transactional screen — cart, checkout, order confirmation, billing history (both relax honest-content). Defaults to the canvas provenance preset if stamped (canvas_set_genre stamps it durably, no token churn). Pick by what the screen is FOR, not what it contains: read screens presenting figures are "dashboard"; a screen you complete a purchase on is "commerce"; editors and admin forms are "material"; a PRICING page is marketing and gets none of them. The result\'s genre field shows what the choice did.'),
+      .describe(GENRE_PARAM_DOC),
     apply: z.boolean().optional()
       .describe('Write the fixes to the canvas in this call (default false: propose only, returning ops to run via batch_design).'),
   },
