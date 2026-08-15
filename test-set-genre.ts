@@ -61,7 +61,11 @@ setCanvasGenre(canvas.id, 'brutalist');
 check('unknown genre stored', getCanvas(canvas.id)?.metadata?.provenance?.preset === 'brutalist');
 check('relaxedByGenre: unknown → []', relaxedByGenre('brutalist').length === 0);
 check('relaxedByGenre: material → accent-hue + pure-black-white', relaxedByGenre('material').sort().join(',') === 'accent-hue,pure-black-white');
-check('knownGenres lists the relax table', knownGenres().sort().join(',') === 'dashboard,data,material', knownGenres().join(','));
+// Pinned on purpose: adding a relax-genre is a deliberate act (it opens a hole
+// in a guardrail), so it should have to be written down here too.
+check('knownGenres lists the relax table', knownGenres().sort().join(',') === 'checkout,commerce,dashboard,data,material', knownGenres().join(','));
+check('relaxedByGenre: commerce → honest-content', relaxedByGenre('commerce').join(',') === 'honest-content');
+check('relaxedByGenre: checkout aliases commerce', relaxedByGenre('checkout').join(',') === 'honest-content');
 
 // Missing canvas → undefined.
 check('unknown canvas → undefined', setCanvasGenre('nope', 'dashboard') === undefined);

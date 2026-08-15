@@ -919,7 +919,24 @@ const RELAXED_BY_GENRE: Record<string, ClicheTell[]> = {
   // screen's whole reason to exist. `data` is an alias.
   dashboard: ['honest-content'],
   data: ['honest-content'],
+  // Phase 29 slice A (#194) — transactional commerce screens: a checkout's
+  // line prices, subtotal, store credit and total ARE the design (they set the
+  // column widths, the decimal alignment, and which number reads as the one
+  // you're about to pay), so the fabricated-data tell zeroes the category for
+  // the screen's whole reason to exist. Scope is the TRANSACTION — cart,
+  // checkout, order confirmation, billing history. NOT a pricing or marketing
+  // page: invented customer counts, savings claims and testimonials are
+  // exactly the slop this tell exists to catch, and `commerce` doesn't touch
+  // them (it relaxes honest-content, which fires on figures — the marketing
+  // slop lands on slop-copy and on honest-content's testimonial/logo shapes).
+  // `checkout` is an alias.
+  commerce: ['honest-content'],
+  checkout: ['honest-content'],
 };
+
+/** Genres that are aliases of another entry — folded out of the genre report
+ * so an alias never reads as a second option. */
+const GENRE_ALIASES = new Set(['data', 'checkout']);
 
 /** Issue #162 — what a genre stamp buys, for canvas_set_genre's immediate
  * feedback (the evaluate-time report stays buildGenreReport's job). */
@@ -933,12 +950,12 @@ export function knownGenres(): string[] {
 /** Issue #152 — make the genre decision visible in the evaluate result: which
  * genre ran, where it came from, what it relaxed, and which tells a DIFFERENT
  * genre would have relaxed (the tradeoff that's otherwise only discoverable by
- * watching the score move). `data` is folded into `dashboard` in relaxedBy so
- * the alias doesn't read as a second option. */
+ * watching the score move). Aliases (`data`, `checkout`) are folded into their
+ * canonical genre in relaxedBy so they don't read as separate options. */
 function buildGenreReport(genre: string | undefined, explicit: boolean, relaxed: Set<ClicheTell>): GenreReport {
   const notRelaxed = new Map<ClicheTell, string[]>();
   for (const [g, tells] of Object.entries(RELAXED_BY_GENRE)) {
-    if (g === 'data') continue; // alias of dashboard
+    if (GENRE_ALIASES.has(g)) continue; // `data` → dashboard, `checkout` → commerce
     for (const tell of tells) {
       if (relaxed.has(tell)) continue;
       const by = notRelaxed.get(tell) ?? [];
@@ -1335,7 +1352,16 @@ const SLOP_COPY_PATTERNS: { name: string; re: RegExp }[] = [
   { name: 'a scroll cue', re: /(^|\s)(↓\s*)?scroll(\s+(down|to explore))?\s*$/i },
   { name: 'a placeholder name', re: /\b(jane|john)\s+doe\b/i },
   { name: 'a hype status label', re: /\b(beta|alpha|early access|invite[-\s]?only|coming soon)\b/i },
-  { name: 'a section-number eyebrow', re: /^\s*0*\d{1,3}\s*[/·.\-—]\s*\p{L}/u },
+  // Phase 29 slice A (#194) — a section-number eyebrow is a numeral SEPARATED
+  // from a word ("01 — Introduction", "1. Overview", "03 / Process"). An
+  // unspaced hyphen binding a numeral to a unit noun is a compound modifier,
+  // not an eyebrow: "30-day plant guarantee", "2-year warranty", "12-month
+  // plan" are ordinary product copy and flagging them taught agents to reword
+  // correct text. So the bare hyphen only counts with whitespace on one side;
+  // the separators that never appear in compound modifiers (/ · . —) still
+  // match tight. ("24/7 support" was already safe: the pattern needs a LETTER
+  // after the separator, and 7 is a digit.)
+  { name: 'a section-number eyebrow', re: /^\s*0*\d{1,3}(?:\s*[/·.—]\s*|\s+-\s*|\s*-\s+)\p{L}/u },
 ];
 function tellSlopCopy(ctx: ClicheCtx): EvaluationIssue[] {
   if (ctx.relaxed.has('slop-copy')) return [];
