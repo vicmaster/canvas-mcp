@@ -1,6 +1,6 @@
 {
   "hero": {
-    "overallScore": 70,
+    "overallScore": 72,
     "categories": [
       {
         "name": "spacing",
@@ -10,12 +10,12 @@
       {
         "name": "color",
         "score": 63,
-        "issueCount": 7
+        "issueCount": 14
       },
       {
         "name": "typography",
         "score": 80,
-        "issueCount": 2
+        "issueCount": 5
       },
       {
         "name": "structure",
@@ -28,17 +28,27 @@
         "issueCount": 4
       },
       {
+        "name": "usability",
+        "score": 100,
+        "issueCount": 0
+      },
+      {
+        "name": "coverage",
+        "score": 30,
+        "issueCount": 2
+      },
+      {
         "name": "cliche",
         "score": 28,
         "issueCount": 10
       }
     ],
-    "issueCount": 28,
+    "issueCount": 40,
     "issueKeys": [
       "cliche::big::\"$48,290\" looks like fabricated data (a money figure).",
       "cliche::btxt::\"+12%\" looks like fabricated data (a percentage).",
-      "cliche::doc::4 eyebrow labels across 4 sections — an eyebrow above (nearly) every heading reads as template rhythm.",
-      "cliche::doc::5 distinct corner radii in use (2, 6, 16, 20, 999px) — mixed radius systems read as inconsistent.",
+      "cliche::doc::3 eyebrow labels across 4 sections — an eyebrow above (nearly) every heading reads as template rhythm.",
+      "cliche::doc::4 distinct corner radii in use (2, 6, 16, 20px) — mixed radius systems read as inconsistent.",
       "cliche::doc::7 nodes use gradients — gradient overuse is a machine-made tell.",
       "cliche::s1-d::\"↑ 5.2% vs last week\" looks like fabricated data (a percentage).",
       "cliche::s1-v::\"1,284\" looks like fabricated data (a large count).",
@@ -46,23 +56,35 @@
       "cliche::s3-d::\"↓ 2.1% vs last week\" looks like fabricated data (a percentage).",
       "cliche::s3-v::\"$87\" looks like fabricated data (a money figure).",
       "color::btxt::Text \"+12%\" has contrast ratio 1.32:1 against rgba(16,185,129,0.12). WCAG AA requires 4.5:1.",
+      "color::hdr-l::APCA advisory: Lc 48.1 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
       "color::m1::Text \"Jan\" has contrast ratio 3.07:1 against #1E293B. WCAG AA requires 4.5:1.",
       "color::m2::Text \"Feb\" has contrast ratio 3.07:1 against #1E293B. WCAG AA requires 4.5:1.",
       "color::m3::Text \"Mar\" has contrast ratio 3.07:1 against #1E293B. WCAG AA requires 4.5:1.",
       "color::m4::Text \"Apr\" has contrast ratio 3.07:1 against #1E293B. WCAG AA requires 4.5:1.",
       "color::m5::Text \"May\" has contrast ratio 3.07:1 against #1E293B. WCAG AA requires 4.5:1.",
+      "color::s1-d::APCA advisory: Lc 62.6 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
+      "color::s1-l::APCA advisory: Lc 48.1 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
+      "color::s2-d::APCA advisory: Lc 62.6 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
+      "color::s2-l::APCA advisory: Lc 48.1 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
+      "color::s3-d::APCA advisory: Lc 45.5 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
+      "color::s3-l::APCA advisory: Lc 48.1 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
       "color::sub::Text \"Last 6 months\" has contrast ratio 3.07:1 against #1E293B. WCAG AA requires 4.5:1.",
       "consistency::card::Frame \"card\" has 5 children but no layout property.",
       "consistency::s1::Frame \"s1\" has 3 children but no layout property.",
       "consistency::s2::Frame \"s2\" has 3 children but no layout property.",
       "consistency::s3::Frame \"s3\" has 3 children but no layout property.",
+      "coverage::doc::This screen has a data table but no \"empty\" state variant is designed — the shipped UI will improvise it.",
+      "coverage::doc::This screen has a data table but no \"loading\" state variant is designed — the shipped UI will improvise it.",
       "spacing::badge::gap: 6px is not on the spacing scale.",
       "spacing::badge::padding: [6, 12] has off-scale entries (6).",
-      "spacing::doc::Design uses 8 unique spacing values. Consider consolidating to 4-6 values.",
+      "spacing::doc::Design uses 8 unique spacing values and declares no spacing scale. Consider consolidating to 4-6 values, or declare a scale with set_variables.",
       "structure::doc::No component instances found in 36 nodes. Consider extracting repeated patterns into components.",
       "structure::doc::Only 0% of container nodes have names. Naming improves maintainability.",
       "typography::btxt::Font sizes 13px → 12px have ratio 1.08 (expected 1.1-2.0).",
-      "typography::hdr-l::Font sizes 14px → 13px have ratio 1.08 (expected 1.1-2.0)."
+      "typography::hdr-l::Font sizes 14px → 13px have ratio 1.08 (expected 1.1-2.0).",
+      "typography::s1-v::Display text at 28px with default tracking — large sizes read tighter with slight negative letter-spacing.",
+      "typography::s2-v::Display text at 28px with default tracking — large sizes read tighter with slight negative letter-spacing.",
+      "typography::s3-v::Display text at 28px with default tracking — large sizes read tighter with slight negative letter-spacing."
     ]
   },
   "minimal": {
@@ -76,7 +98,7 @@
       {
         "name": "color",
         "score": 100,
-        "issueCount": 0
+        "issueCount": 1
       },
       {
         "name": "typography",
@@ -94,19 +116,30 @@
         "issueCount": 1
       },
       {
+        "name": "usability",
+        "score": 100,
+        "issueCount": 0
+      },
+      {
+        "name": "coverage",
+        "score": 100,
+        "issueCount": 0
+      },
+      {
         "name": "cliche",
         "score": 100,
         "issueCount": 0
       }
     ],
-    "issueCount": 2,
+    "issueCount": 3,
     "issueKeys": [
+      "color::sub::APCA advisory: Lc 48.1 (guideline ~75 for this size) against #1E293B — passes WCAG 2.2 (the gate), but perceptual contrast is weak.",
       "consistency::card::Frame \"card\" has 2 children but no layout property.",
       "structure::doc::Only 0% of container nodes have names. Naming improves maintainability."
     ]
   },
   "bad-contrast": {
-    "overallScore": 77,
+    "overallScore": 82,
     "categories": [
       {
         "name": "spacing",
@@ -121,7 +154,7 @@
       {
         "name": "typography",
         "score": 100,
-        "issueCount": 0
+        "issueCount": 1
       },
       {
         "name": "structure",
@@ -134,17 +167,28 @@
         "issueCount": 0
       },
       {
+        "name": "usability",
+        "score": 100,
+        "issueCount": 0
+      },
+      {
+        "name": "coverage",
+        "score": 100,
+        "issueCount": 0
+      },
+      {
         "name": "cliche",
         "score": 100,
         "issueCount": 0
       }
     ],
-    "issueCount": 4,
+    "issueCount": 5,
     "issueKeys": [
       "color::t1::Text \"Almost invisible heading\" has contrast ratio 1.05:1 against #F8FAFC. WCAG AA requires 3:1.",
       "color::t2::Text \"Barely-there subtitle\" has contrast ratio 1.18:1 against #F8FAFC. WCAG AA requires 3:1.",
       "color::t3::Text \"Hard to read body copy goes ri\" has contrast ratio 1.07:1 against #FAFAFA. WCAG AA requires 4.5:1.",
-      "structure::doc::Only 0% of container nodes have names. Naming improves maintainability."
+      "structure::doc::Only 0% of container nodes have names. Naming improves maintainability.",
+      "typography::t1::Display text at 28px with default tracking — large sizes read tighter with slight negative letter-spacing."
     ]
   }
 }
