@@ -68,6 +68,10 @@ export interface SceneNode {
   height?: number | string;
   minWidth?: number | string;
   maxWidth?: number | string;
+  /** Phase 29 slice C — a height FLOOR. A fixed `height` clips when content
+   * outgrows it (the bento tiles did, under hostile copy); `minHeight` holds
+   * the intended proportion at rest and lets the box grow instead. */
+  minHeight?: number | string;
   layout?: 'horizontal' | 'vertical' | 'grid' | 'none';
   gap?: number | string;              // number, or a "$space-*" token ref
   /** grid only (Phase 26 slice A) — row-axis gap override; `gap` covers both

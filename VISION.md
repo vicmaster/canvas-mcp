@@ -533,7 +533,7 @@ The checkout attempt (2026-08-15) asked whether v2.0.0 holds on a screen type de
 
 - [x] Slice A — commerce vocabulary: a `commerce` genre relaxing `honest-content` for transactional screens (scoped away from marketing pages), plus a retail-copy guard so "30-day guarantee" stops reading as a section-number eyebrow
 - [x] Slice B — generator preservation: field-wise typography merge so a preserved size never drops the personality's face, a `designSystemConflicts` report distinct from ordinary preservation when the kept token is one the generator's own semantic vocabulary owns (colors + type roles), and an explicit `preserveInherited: false` opt-out
-- [ ] Slice C — scaffolds on the system: every structure references type roles instead of literal pixel sizes, every component scaffold survives long-text and i18n, and one regression test stamps them all
+- [x] Slice C — scaffolds on the system: every structure references type roles instead of literal pixel sizes, every component scaffold survives long-text and i18n, and one regression test stamps them all
 - [ ] Slice D — advisory honesty: the unsatisfiable sibling-padding check scoped or removed, spacing variety recalibrated, and the directive no longer withholding readiness when nothing blocking remains
 - [ ] Slice E — renderer and capture: the oversized-artboard duplicate band, `responsive: "fixed"` implemented or withdrawn, and a way to capture a design taller than its artboard
 

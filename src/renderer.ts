@@ -627,6 +627,7 @@ function buildStyles(node: SceneNode, registered?: ReadonlySet<string>): string 
     }
   }
   if (node.minWidth !== undefined) s.push(`min-width: ${cssLength(node.minWidth)}`);
+  if (node.minHeight !== undefined) s.push(`min-height: ${cssLength(node.minHeight)}`);
   if (node.maxWidth !== undefined) s.push(`max-width: ${cssLength(node.maxWidth)}`);
   if (node.height !== undefined) s.push(`height: ${cssLength(node.height)}`);
 
