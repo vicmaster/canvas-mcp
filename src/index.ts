@@ -1051,7 +1051,15 @@ The DARK theme ships in the same call (the Radix pattern: a reversed walk of the
       // Phase 29 FR-B2 — same contract as generate_design_system: an inherited
       // value for a token in the semantic vocabulary THIS call defines is a
       // conflict, not a footnote. Everything else stays a plain preservation.
-      const ownedColors = new Set(Object.keys(system.light));
+      // Same widening as generate_design_system: status, tints and the chart
+      // range are all defined by this call, so an inherited value for any of
+      // them is a conflict rather than a footnote.
+      const ownedColors = new Set([
+        ...Object.keys(system.light),
+        ...Object.keys(system.status ?? {}),
+        ...Object.keys(system.tints ?? {}),
+        ...Object.keys(system.categorical ?? {}),
+      ]);
       const csConflicts = preserved.filter((e) => e.category === 'colors' && ownedColors.has(e.key)).map((e) => ({
         ...e,
         why: `"${e.key}" is part of the semantic vocabulary this system defines — an inherited value here mixes two color languages on one screen.`,
@@ -1092,7 +1100,7 @@ Personalities (required — pick a stance, don't default into sameness):
 - "soft" — warm, rounded, human (Plus Jakarta Sans + Inter, 12/16/20 radii, springy motion). For consumer apps, onboarding, anything friendly.
 - "data-dense" — instrument-panel density (Inter + a JetBrains Mono "figures" role, 13px pivot, minimal radii, near-flat depth). For dashboards, tables, monitoring.
 
-The typography layer ships ROLE tokens the structures speak — $display / $heading / $title (page/screen titles, one step below $display — every archetype's page title references it) / $body / $label / $caption (+ $figures when a mono face exists) — alongside the text-xs…text-3xl steps. Depth: reference elevation from any node as shadow: "$elevation.flat|raised|floating|overlay" — the dark layer re-states each depth so it reads on dark surfaces. The COLOR RANGE rides along (Phase 28): $chart-1…$chart-6 categorical series tokens for dataviz, and the tint layer ($accent-tint / $success-tint / … — tint as fill, base color as ink, AA by construction both themes) for chips, icon tiles, pills, and avatars. Writes to exactly ONE of canvasId / projectId / workspaceId. Canvas scope keeps tokens the canvas resolves through an inherited design system rather than clobbering them — but preservation is FIELD-WISE for typography, so an inherited role that carries only a size keeps that size and still picks up this personality's family/weight/tracking (before v2.1 it swallowed the whole spec and the role silently rendered in the fallback stack). What was kept is reported two ways: \`preservedFromDesignSystem\` for ordinary tokens, and \`designSystemConflicts\` for tokens in the semantic vocabulary THIS system defines (bg-surface, text-primary, border, accent, the type roles) — a conflict means the screen is running two design languages at once, and each entry names the fix. \`preserveInherited: false\` writes the generated language whole. The response's typographyRoles reports what the canvas ACTUALLY resolves, not what was generated — the two differ exactly when preservation fired. The two single-purpose generators stay available for targeted regeneration (just the palette, just the scale).`,
+The typography layer ships ROLE tokens the structures speak — $display / $heading / $title (page/screen titles, one step below $display — every archetype's page title references it) / $body / $label / $caption (+ $figures when a mono face exists) — alongside the text-xs…text-3xl steps. Depth: reference elevation from any node as shadow: "$elevation.flat|raised|floating|overlay" — the dark layer re-states each depth so it reads on dark surfaces. The COLOR RANGE rides along (Phase 28): $chart-1…$chart-6 categorical series tokens for dataviz, and the tint layer ($accent-tint / $success-tint / … — tint as fill, base color as ink, AA by construction both themes) for chips, icon tiles, pills, and avatars. Writes to exactly ONE of canvasId / projectId / workspaceId. Canvas scope keeps tokens the canvas resolves through an inherited design system rather than clobbering them — but preservation is FIELD-WISE for typography, so an inherited role that carries only a size keeps that size and still picks up this personality's family/weight/tracking (before v2.1 it swallowed the whole spec and the role silently rendered in the fallback stack). What was kept is reported two ways: \`preservedFromDesignSystem\` for ordinary tokens, and \`designSystemConflicts\` for tokens in the semantic vocabulary THIS system defines (the surface/ink/border/accent semantics, the STATUS colours and their paired -tint layer, the \$chart-* range, and the type roles — an inherited success keeps pairing with the GENERATED success-tint and fails contrast) — a conflict means the screen is running two design languages at once, and each entry names the fix. \`preserveInherited: false\` writes the generated language whole. The response's typographyRoles reports what the canvas ACTUALLY resolves, not what was generated — the two differ exactly when preservation fired. The two single-purpose generators stay available for targeted regeneration (just the palette, just the scale).`,
   {
     seed: z.string().describe('The brand color to derive everything from (#RRGGBB)'),
     personality: z.enum(['technical', 'editorial', 'soft', 'data-dense']).describe('The design stance — required. Genre guide: dashboards → data-dense or technical; marketing/content → editorial; consumer → soft.'),
@@ -1145,7 +1153,19 @@ The typography layer ships ROLE tokens the structures speak — $display / $head
       // inherited a near-black \`border\` onto a light-green system and every
       // hairline would have been a hard rule. Report those separately, with the
       // fix named, instead of burying them in a list an agent skims.
-      const ownedColors = new Set(Object.keys(system.colorSystem.light));
+      // The generator owns MORE than the light semantics: it AA-tunes the status
+      // colors against its own surfaces and pairs the tint layer with them, and
+      // it hue-walks the chart range. Slice B keyed the owned set on
+      // `colorSystem.light` alone, so an inherited `success` silently overruled
+      // an AA-tuned one, kept pairing with the GENERATED `success-tint`, and
+      // failed contrast at 2:1 — reported as an ordinary preservation an agent
+      // would skim past. The Phase 29 acceptance re-run hit exactly that.
+      const ownedColors = new Set([
+        ...Object.keys(system.colorSystem.light),
+        ...Object.keys(system.colorSystem.status ?? {}),
+        ...Object.keys(system.colorSystem.tints ?? {}),
+        ...Object.keys(system.colorSystem.categorical ?? {}),
+      ]);
       const ownedRoles = new Set(['display', 'heading', 'title', 'body', 'label', 'caption', 'figures']);
       const owns = (e: { category: string; key: string }) =>
         (e.category === 'colors' && ownedColors.has(e.key)) || (e.category === 'typography' && ownedRoles.has(e.key));

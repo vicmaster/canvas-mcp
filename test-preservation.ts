@@ -102,6 +102,22 @@ const fresh = (): Canvas => createCanvas('preservation');
   check('a colour inheritance does not define is written', canvas.variables.colors?.['accent'] === '#317345');
 }
 
+// ── an inherited STATUS colour is a conflict, not a footnote ─────────────────
+{
+  // Found by the Phase 29 acceptance re-run. The generator AA-tunes success /
+  // warning / danger against its own surfaces and pairs the tint layer with
+  // them, so an inherited `success` keeps pairing with the GENERATED
+  // `success-tint` and fails contrast — while being reported as an ordinary
+  // preservation an agent skims past. Status colours are owned vocabulary.
+  const canvas = fresh();
+  const inheritedStatus: DesignVariables = { colors: { success: '#22c55e' } };
+  const generated: Partial<DesignVariables> = { colors: { success: '#007F38', 'success-tint': '#DAF8DF' } };
+  const { preserved } = applyPresetTokens(canvas, generated, inheritedStatus);
+  const entry = preserved.find((p) => p.key === 'success');
+  check('an inherited status colour is preserved and reported', entry?.kept === '#22c55e' && entry?.preset === '#007F38');
+  check('...while the tint it pairs with is written from the generated system', canvas.variables.colors?.['success-tint'] === '#DAF8DF');
+}
+
 // ── FR-B3: the opt-out writes the language whole ─────────────────────────────
 {
   const canvas = fresh();
