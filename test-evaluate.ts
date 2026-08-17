@@ -59,7 +59,15 @@ I("document", {type: "checkbox", width: 14, height: 14})
 
   const result = await evaluateCanvas(canvas, { mode: 'fast' });
 
-  assert(result.overallScore < 70, `Overall score is low: ${result.overallScore}/100`);
+  // Phase 29 slice D — was `< 70`, which sat one point from this fixture's actual
+  // score and so was really pinned to a specific number rather than to the
+  // intent. Deleting the sibling-padding advisory (a non-defect: these two frames
+  // differ in padding, and the fact that BOTH values are off-scale is already
+  // reported separately as spacing warnings) moved it 69 → 70. The intent — a
+  // deliberately bad canvas cannot score respectably — holds with room to spare:
+  // this fixture still carries an error-severity usability finding, two spacing
+  // warnings, and excessive depth.
+  assert(result.overallScore < 75, `Overall score is low: ${result.overallScore}/100`);
   assert(result.issues.length > 0, `Has issues: ${result.issues.length} found`);
 
   const colorIssues = result.issues.filter(i => i.category === 'color');
