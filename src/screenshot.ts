@@ -69,10 +69,16 @@ export interface ScreenshotOptions {
   height?: number;
   scale?: number;
   nodeId?: string;
+  /** Phase 29 slice E — capture the whole scrollable document instead of just
+   * the viewport. Off by default so every existing caller (diffs, exports,
+   * responsive sets, the pattern gate) keeps producing byte-identical output;
+   * a design taller than its artboard previously could only be seen by editing
+   * `document.height` by hand. */
+  fullPage?: boolean;
 }
 
 export async function takeScreenshot(html: string, options: ScreenshotOptions = {}): Promise<string> {
-  const { width = 1440, height = 900, scale = 2, nodeId } = options;
+  const { width = 1440, height = 900, scale = 2, nodeId, fullPage = false } = options;
   const b = await getBrowser();
   const page = await b.newPage();
 
@@ -84,6 +90,34 @@ export async function takeScreenshot(html: string, options: ScreenshotOptions = 
     });
 
     await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+    // A full-document capture has to relax the ARTBOARD, not just ask Puppeteer
+    // for fullPage. The root frame carries the canvas height as a fixed `height`,
+    // so taller content overflows it without extending the scrollable area and
+    // Chrome captures the artboard box either way. Turning that height into a
+    // floor on the root — and only the root, which is body's single child — lets
+    // the document grow to its real content height. Inner fixed heights are
+    // untouched.
+    if (fullPage && !nodeId) {
+      await page.addStyleTag({
+        content: `body > *:first-child { height: auto !important; min-height: ${height}px; }`,
+      });
+      // Puppeteer's own `fullPage` is NOT reliable here: it returns the full
+      // document on a fresh browser, then silently returns viewport-sized output
+      // for every later call once any non-fullPage capture has run in the same
+      // browser. framesmith keeps ONE browser for the whole session and takes
+      // many screenshots through it, so that is the normal case, not the edge —
+      // the flag would have appeared to work in a unit test and failed in use.
+      // Measuring the document and sizing the viewport to it is deterministic
+      // and owes nothing to that behaviour.
+      const contentHeight = await page.evaluate(() => Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+      ));
+      if (contentHeight > height) {
+        await page.setViewport({ width, height: contentHeight, deviceScaleFactor: scale });
+      }
+    }
 
     let screenshotBuffer: Uint8Array;
 

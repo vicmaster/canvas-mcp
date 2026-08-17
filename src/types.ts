@@ -95,7 +95,14 @@ export interface SceneNode {
   //   wrap  — children wrap to the next line instead of overflowing
   //   fixed — never reflows (e.g. toolbars). Marker today; reserved for future
   //           opt-out of descendant fluid scaling.
-  responsive?: 'stack' | 'wrap' | 'fixed';
+  /** Responsive hint. Both values are opt-IN reflow behaviours: `stack` flips a
+   * horizontal container to vertical below 768px, `wrap` lets children wrap.
+   * A container with no hint already never reflows, which is why the former
+   * third value `fixed` was withdrawn in Phase 29 slice E — it was documented
+   * for four releases while nothing in the renderer ever read it, so it
+   * promised an opt-out from a behaviour that was never opt-out in the first
+   * place. Unknown values remain inert rather than throwing. */
+  responsive?: 'stack' | 'wrap';
 
   // Position (when layout is 'none' on parent)
   x?: number;

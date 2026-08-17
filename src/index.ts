@@ -555,8 +555,7 @@ Input controls: toggle / checkbox / radio / select are real node types — I("pa
 Responsive layout (author desktop-first, adapt down):
   - responsive: "stack" — on a horizontal container, flips to vertical below 768px (multi-column layouts that should stack on mobile)
   - responsive: "wrap" — children wrap to the next line instead of overflowing (card grids, tag rows)
-  - responsive: "fixed" — never reflows (toolbars, fixed-position headers)
-Prefer fluid widths (percentages, "fit-content") + a "responsive" hint over hardcoded pixel widths. width/minWidth/maxWidth accept numbers (px) or strings ("100%", "50vw", "fit-content"). Combine a percentage width with a maxWidth ceiling for content that fills the row but caps on wide screens (e.g. width: "100%", maxWidth: 600). minHeight is the height analog: a floor that holds a card's rest-state rhythm without clipping when hostile-length content forces it taller — prefer it over a fixed height on any node whose content can grow.
+A container with NO responsive hint already never reflows — both hints are opt-in, so there is nothing to opt out of. Prefer fluid widths (percentages, "fit-content") + a "responsive" hint over hardcoded pixel widths. width/minWidth/maxWidth accept numbers (px) or strings ("100%", "50vw", "fit-content"). Combine a percentage width with a maxWidth ceiling for content that fills the row but caps on wide screens (e.g. width: "100%", maxWidth: 600). minHeight is the height analog: a floor that holds a card's rest-state rhythm without clipping when hostile-length content forces it taller — prefer it over a fixed height on any node whose content can grow.
 
 Read the framesmith://guidelines resource for common patterns (pricing tiers, two-column hero, tag list, toolbar), anti-patterns, and width-strategy guidance.`,
   {
@@ -785,10 +784,11 @@ server.tool(
     nodeId: z.string().optional().describe('Specific node ID to screenshot (defaults to full canvas)'),
     width: z.number().optional().describe('Viewport width in pixels (default 1440)'),
     height: z.number().optional().describe('Viewport height in pixels (default 900)'),
+    fullPage: z.boolean().optional().describe('Capture the whole design rather than one viewport. A canvas taller than its artboard is otherwise cut off at the artboard height, and the only way to see the rest was to edit the root height by hand. Default false, so existing captures are unchanged.'),
     scale: z.number().optional().describe('Device scale factor (default 2 for retina)'),
     theme: z.enum(['light', 'dark']).optional().describe('Render theme — "dark" applies the design system\'s dark token layer (dark.colors/dark.elevation overrides); default light. No-op when no dark layer exists.'),
   },
-  async ({ canvasId, nodeId, width, height, scale, theme }) => {
+  async ({ canvasId, nodeId, width, height, scale, theme, fullPage }) => {
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
@@ -796,7 +796,7 @@ server.tool(
     const w = width ?? (typeof canvas.root.width === 'number' ? canvas.root.width : 1440);
     const h = height ?? (typeof canvas.root.height === 'number' ? canvas.root.height : 900);
     const html = renderToHtml(resolved, w, h, canvas, renderOpts);
-    const base64 = await takeScreenshot(html, { width: w, height: h, scale, nodeId });
+    const base64 = await takeScreenshot(html, { width: w, height: h, scale, nodeId, fullPage });
 
     return {
       content: [
