@@ -50,7 +50,14 @@ const ELEV = {
   raised: '$elevation.raised',
 } as const;
 const TYPE = {
-  title: '$title',     // page titles — the display face when a personality is set
+  display: '$display',   // hero headlines — the display face at full size
+  title: '$title',       // page/screen titles, one step below display
+  heading: '$heading',   // section heads
+  textLg: '$text-lg',    // card titles, subheads — the step above body
+  textSm: '$text-sm',    // small body text — untracked (nav items, prose, meta)
+  body: '$body',         // prose and item text
+  label: '$label',       // control, CTA, breadcrumb and table-header text
+  caption: '$caption',   // metadata, timestamps, eyebrows
 } as const;
 /** Phase 28 — the tint pair: tint as the FILL, base color as the INK. */
 const TINT = {
@@ -75,7 +82,8 @@ function card(
     type: 'frame',
     name: label,
     width,
-    height,
+    minHeight: height,
+    minWidth: 0,
     layout: 'vertical',
     justifyContent: 'space-between',
     gap: SPACE.md,
@@ -85,8 +93,8 @@ function card(
     stroke: COLOR.border,
     strokeWidth: 1,
     children: [
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 20, fontWeight: 600, color: COLOR.textPrimary },
-      { id: `${id}-body`, type: 'text', content: body, fontSize: 14, color: COLOR.textSecondary, lineHeight: 1.5 },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: TYPE.textLg, fontWeight: 600, color: COLOR.textPrimary, minWidth: 0 },
+      { id: `${id}-body`, type: 'text', content: body, fontSize: TYPE.textSm, color: COLOR.textSecondary, lineHeight: 1.5, minWidth: 0 },
     ],
   };
 }
@@ -107,7 +115,7 @@ function button(id: string, label: string, fill: string, color: string, stroke?:
     fill,
     ...(stroke ? { stroke, strokeWidth: 1 } : {}),
     // Buttons survive hostile-length labels by truncating (designed ellipsis).
-    children: [{ id: `${id}-label`, type: 'text', content: label, fontSize: 16, fontWeight: 600, color, textOverflow: 'ellipsis' }],
+    children: [{ id: `${id}-label`, type: 'text', content: label, fontSize: TYPE.body, fontWeight: 600, color, textOverflow: 'ellipsis' }],
   };
 }
 
@@ -143,7 +151,7 @@ function stat(id: string, icon = 'activity'): SceneNode {
               },
               // Uppercase is sanctioned here: the eyebrow census knows a label
               // beside a big tabular figure names a metric, not a section.
-              { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+              { id: `${id}-label`, type: 'text', content: 'Stat label', fontSize: TYPE.caption, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
             ],
           },
           { id: `${id}-menu`, type: 'icon', icon: 'ellipsis-vertical', iconSize: 14, iconColor: COLOR.textSecondary },
@@ -156,8 +164,8 @@ function stat(id: string, icon = 'activity'): SceneNode {
           {
             id: `${id}-vc`, type: 'frame', layout: 'horizontal', alignItems: 'end', gap: SPACE.xs2, minWidth: 0,
             children: [
-              { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, letterSpacing: -0.5, tabularNums: true, textOverflow: 'ellipsis' },
-              { id: `${id}-ctx`, type: 'text', content: 'of target', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+              { id: `${id}-value`, type: 'text', content: 'Metric — TBD', fontSize: TYPE.title, fontWeight: 700, color: COLOR.textPrimary, letterSpacing: -0.5, tabularNums: true, textOverflow: 'ellipsis' },
+              { id: `${id}-ctx`, type: 'text', content: 'of target', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
             ],
           },
           {
@@ -170,13 +178,13 @@ function stat(id: string, icon = 'activity'): SceneNode {
         id: `${id}-foot`, type: 'frame', name: 'Delta row', width: '100%', layout: 'horizontal',
         alignItems: 'center', justifyContent: 'space-between', gap: SPACE.xs, overflow: 'hidden',
         children: [
-          { id: `${id}-period`, type: 'text', content: 'vs last period', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+          { id: `${id}-period`, type: 'text', content: 'vs last period', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
           {
             id: `${id}-pill`, type: 'frame', name: 'Pill', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
             padding: [2, SPACE.xs], cornerRadius: 999, fill: TINT.success.bg, overflow: 'hidden',
             children: [
               { id: `${id}-pill-icon`, type: 'icon', icon: 'trending-up', iconSize: 12, iconColor: TINT.success.ink },
-              { id: `${id}-pill-text`, type: 'text', content: 'Change — TBD', fontSize: 12, fontWeight: 600, color: TINT.success.ink, textOverflow: 'ellipsis' },
+              { id: `${id}-pill-text`, type: 'text', content: 'Change — TBD', fontSize: TYPE.caption, fontWeight: 600, color: TINT.success.ink, textOverflow: 'ellipsis' },
             ],
           },
         ],
@@ -203,11 +211,11 @@ function navItem(id: string, label: string, icon = 'circle', opts: { active?: bo
     fill: active ? COLOR.bgElevated : 'transparent',
     children: [
       { id: `${id}-icon`, type: 'icon', icon, iconSize: 16, iconColor: active ? COLOR.accent : COLOR.textSecondary },
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, fontWeight: active ? 600 : 400, color: active ? COLOR.textPrimary : COLOR.textSecondary, textOverflow: 'ellipsis' },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: TYPE.textSm, fontWeight: active ? 600 : 400, color: active ? COLOR.textPrimary : COLOR.textSecondary, textOverflow: 'ellipsis' },
       ...(opts.badge ? [{
         id: `${id}-badge`, type: 'frame' as const, name: 'Badge', layout: 'horizontal' as const, alignItems: 'center' as const,
         justifyContent: 'center' as const, minWidth: 20, padding: [2, SPACE.xs2], cornerRadius: 999, fill: COLOR.bgElevated,
-        children: [{ id: `${id}-badge-text`, type: 'text' as const, content: opts.badge, fontSize: 12, fontWeight: 600, color: COLOR.textSecondary, tabularNums: true }],
+        children: [{ id: `${id}-badge-text`, type: 'text' as const, content: opts.badge, fontSize: TYPE.caption, fontWeight: 600, color: COLOR.textSecondary, tabularNums: true }],
       }] : []),
     ],
   };
@@ -219,7 +227,7 @@ function navGroup(id: string, label: string, items: SceneNode[]): SceneNode {
   return {
     id, type: 'frame', name: label, width: '100%', layout: 'vertical', gap: SPACE.xxs,
     children: [
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 12, fontWeight: 600, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: TYPE.caption, fontWeight: 600, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
       ...items,
     ],
   };
@@ -239,8 +247,8 @@ function activityRow(id: string, icon: string): SceneNode {
       {
         id: `${id}-copy`, type: 'frame', name: 'Copy', layout: 'vertical', minWidth: 0,
         children: [
-          { id: `${id}-text`, type: 'text', content: 'Activity item — to confirm', fontSize: 14, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
-          { id: `${id}-time`, type: 'text', content: 'Timestamp — TBD', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+          { id: `${id}-text`, type: 'text', content: 'Activity item — to confirm', fontSize: TYPE.textSm, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+          { id: `${id}-time`, type: 'text', content: 'Timestamp — TBD', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
         ],
       },
     ],
@@ -270,8 +278,8 @@ function catItem(id: string): SceneNode {
         gap: SPACE.xs,
         padding: SPACE.md,
         children: [
-          { id: `${id}-title`, type: 'text', content: 'Item title', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
-          { id: `${id}-meta`, type: 'text', content: 'Meta — to confirm', fontSize: 13, color: COLOR.textSecondary },
+          { id: `${id}-title`, type: 'text', content: 'Item title', fontSize: TYPE.body, fontWeight: 600, color: COLOR.textPrimary },
+          { id: `${id}-meta`, type: 'text', content: 'Meta — to confirm', fontSize: TYPE.textSm, color: COLOR.textSecondary },
         ],
       },
     ],
@@ -283,7 +291,7 @@ function field(id: string, label: string): SceneNode {
   return {
     id, type: 'frame', name: label, width: '100%', layout: 'vertical', gap: SPACE.xs,
     children: [
-      { id: `${id}-label`, type: 'text', content: label, fontSize: 14, fontWeight: 600, color: COLOR.textSecondary },
+      { id: `${id}-label`, type: 'text', content: label, fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.textSecondary },
       { id: `${id}-input`, type: 'frame', name: 'Input', width: '100%', height: 44, cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1 },
     ],
   };
@@ -292,10 +300,10 @@ function field(id: string, label: string): SceneNode {
 /** A feature row: a check icon + a placeholder feature label. */
 function featureRow(id: string): SceneNode {
   return {
-    id, type: 'frame', name: 'Feature', width: '100%', layout: 'horizontal', gap: SPACE.xs, alignItems: 'center',
+    id, type: 'frame', name: 'Feature', width: '100%', minWidth: 0, layout: 'horizontal', gap: SPACE.xs, alignItems: 'center',
     children: [
       { id: `${id}-icon`, type: 'icon', icon: 'check', iconSize: 16, iconColor: COLOR.accent },
-      { id: `${id}-text`, type: 'text', content: 'Feature — to confirm', fontSize: 14, color: COLOR.textSecondary },
+      { id: `${id}-text`, type: 'text', content: 'Feature — to confirm', fontSize: TYPE.textSm, color: COLOR.textSecondary, width: '100%', minWidth: 0 },
     ],
   };
 }
@@ -309,8 +317,8 @@ function tier(id: string, name: string): SceneNode {
       {
         id: `${id}-head`, type: 'frame', name: 'Tier head', width: '100%', layout: 'vertical', gap: SPACE.xs,
         children: [
-          { id: `${id}-name`, type: 'text', content: name, fontSize: 16, fontWeight: 600, color: COLOR.textSecondary },
-          { id: `${id}-price`, type: 'text', content: 'Price — to confirm', fontSize: 32, fontWeight: 700, color: COLOR.textPrimary },
+          { id: `${id}-name`, type: 'text', content: name, fontSize: TYPE.body, fontWeight: 600, color: COLOR.textSecondary },
+          { id: `${id}-price`, type: 'text', content: 'Price — to confirm', fontSize: TYPE.title, fontWeight: 700, color: COLOR.textPrimary },
         ],
       },
       {
@@ -318,9 +326,9 @@ function tier(id: string, name: string): SceneNode {
         children: [featureRow(`${id}-f1`), featureRow(`${id}-f2`), featureRow(`${id}-f3`)],
       },
       {
-        id: `${id}-cta`, type: 'frame', name: 'Choose plan', width: '100%', layout: 'horizontal',
+        id: `${id}-cta`, type: 'frame', name: 'Choose plan', width: '100%', minWidth: 0, overflow: 'hidden', layout: 'horizontal',
         alignItems: 'center', justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
-        children: [{ id: `${id}-cta-label`, type: 'text', content: 'Choose plan', fontSize: 14, fontWeight: 600, color: COLOR.bgPrimary }],
+        children: [{ id: `${id}-cta-label`, type: 'text', content: 'Choose plan', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.bgPrimary, textOverflow: 'ellipsis', minWidth: 0 }],
       },
     ],
   };
@@ -335,8 +343,8 @@ function settingsRow(id: string, on: boolean): SceneNode {
       {
         id: `${id}-text`, type: 'frame', layout: 'vertical', gap: SPACE.xs,
         children: [
-          { id: `${id}-label`, type: 'text', content: 'Setting label', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
-          { id: `${id}-desc`, type: 'text', content: 'Description — to confirm', fontSize: 12, color: COLOR.textSecondary },
+          { id: `${id}-label`, type: 'text', content: 'Setting label', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.textPrimary },
+          { id: `${id}-desc`, type: 'text', content: 'Description — to confirm', fontSize: TYPE.caption, color: COLOR.textSecondary },
         ],
       },
       { id: `${id}-toggle`, type: 'toggle', checked: on },
@@ -365,14 +373,16 @@ const marqueeHero: Structure = {
       padding: ['$space-3xl', SPACE.xl2],
       fill: COLOR.bgPrimary,
       children: [
-        { id: 'mh-eyebrow', type: 'text', name: 'Eyebrow', content: 'Eyebrow — short label', fontSize: 14, fontWeight: 600, color: COLOR.accent, textAlign: 'center', letterSpacing: 1 },
-        { id: 'mh-headline', type: 'text', name: 'Headline', content: 'Headline', fontSize: 56, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.1, maxWidth: 880 },
-        { id: 'mh-subhead', type: 'text', name: 'Subheadline', content: 'Body copy — one or two supporting sentences.', fontSize: 20, fontWeight: 400, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 640 },
+        { id: 'mh-eyebrow', type: 'text', name: 'Eyebrow', content: 'Eyebrow — short label', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.accent, textAlign: 'center', letterSpacing: 1 },
+        { id: 'mh-headline', type: 'text', name: 'Headline', content: 'Headline', fontSize: TYPE.display, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.1, maxWidth: 880 },
+        { id: 'mh-subhead', type: 'text', name: 'Subheadline', content: 'Body copy — one or two supporting sentences.', fontSize: TYPE.textLg, fontWeight: 400, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 640 },
         {
           id: 'mh-cta',
           type: 'frame',
           name: 'CTA row',
           layout: 'horizontal',
+          minWidth: 0,
+          wrap: true,
           gap: SPACE.md,
           responsive: 'stack',
           alignItems: 'center',
@@ -396,8 +406,8 @@ const marqueeHero: Structure = {
       padding: ['$space-3xl', SPACE.xl2],
       fill: COLOR.bgSurface,
       children: [
-        { id: 'mh-support-title', type: 'text', content: 'Supporting section', fontSize: 28, fontWeight: 600, color: COLOR.textPrimary, textAlign: 'center' },
-        { id: 'mh-support-body', type: 'text', content: 'Body copy — expand on the promise above.', fontSize: 16, color: COLOR.textSecondary, textAlign: 'center', maxWidth: 560, lineHeight: 1.6 },
+        { id: 'mh-support-title', type: 'text', content: 'Supporting section', fontSize: TYPE.title, fontWeight: 600, color: COLOR.textPrimary, textAlign: 'center' },
+        { id: 'mh-support-body', type: 'text', content: 'Body copy — expand on the promise above.', fontSize: TYPE.body, color: COLOR.textSecondary, textAlign: 'center', maxWidth: 560, lineHeight: 1.6 },
       ],
     },
   ],
@@ -429,8 +439,8 @@ const bentoGrid: Structure = {
           layout: 'vertical',
           gap: SPACE.xs,
           children: [
-            { id: 'bn-eyebrow', type: 'text', content: 'Eyebrow — section label', fontSize: 14, fontWeight: 600, color: COLOR.accent, letterSpacing: 1 },
-            { id: 'bn-title', type: 'text', content: 'Headline', fontSize: 40, fontWeight: 700, color: COLOR.textPrimary, lineHeight: 1.2 },
+            { id: 'bn-eyebrow', type: 'text', content: 'Eyebrow — section label', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.accent, letterSpacing: 1 },
+            { id: 'bn-title', type: 'text', content: 'Headline', fontSize: TYPE.display, fontWeight: 700, color: COLOR.textPrimary, lineHeight: 1.2 },
           ],
         },
         {
@@ -485,9 +495,9 @@ const statLed: Structure = {
           alignItems: 'center',
           gap: SPACE.md,
           children: [
-            { id: 'sl-eyebrow', type: 'text', content: 'Eyebrow — short label', fontSize: 14, fontWeight: 600, color: COLOR.accent, textAlign: 'center', letterSpacing: 1 },
-            { id: 'sl-headline', type: 'text', content: 'Headline', fontSize: 48, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.15, maxWidth: 760 },
-            { id: 'sl-subhead', type: 'text', content: 'Body copy — one supporting sentence.', fontSize: 18, color: COLOR.textSecondary, textAlign: 'center', maxWidth: 600, lineHeight: 1.5 },
+            { id: 'sl-eyebrow', type: 'text', content: 'Eyebrow — short label', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.accent, textAlign: 'center', letterSpacing: 1 },
+            { id: 'sl-headline', type: 'text', content: 'Headline', fontSize: TYPE.display, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.15, maxWidth: 760 },
+            { id: 'sl-subhead', type: 'text', content: 'Body copy — one supporting sentence.', fontSize: TYPE.textLg, color: COLOR.textSecondary, textAlign: 'center', maxWidth: 600, lineHeight: 1.5 },
           ],
         },
         {
@@ -532,14 +542,14 @@ const editorialLongform: Structure = {
           layout: 'vertical',
           gap: SPACE.lg,
           children: [
-            { id: 'ed-kicker', type: 'text', content: 'Eyebrow — category', fontSize: 14, fontWeight: 600, color: COLOR.accent, letterSpacing: 1 },
-            { id: 'ed-title', type: 'text', content: 'Headline', fontSize: 44, fontWeight: 700, color: COLOR.textPrimary, lineHeight: 1.2 },
-            { id: 'ed-meta', type: 'text', content: 'Byline — author · date', fontSize: 14, color: COLOR.textSecondary },
-            { id: 'ed-lead', type: 'text', content: 'Lead paragraph — set up the piece in two or three sentences.', fontSize: 20, color: COLOR.textSecondary, lineHeight: 1.6 },
-            { id: 'ed-h2-1', type: 'text', content: 'Section heading', fontSize: 26, fontWeight: 600, color: COLOR.textPrimary, lineHeight: 1.3 },
-            { id: 'ed-body-1', type: 'text', content: 'Body copy — paragraph to confirm.', fontSize: 17, color: COLOR.textSecondary, lineHeight: 1.7 },
-            { id: 'ed-h2-2', type: 'text', content: 'Section heading', fontSize: 26, fontWeight: 600, color: COLOR.textPrimary, lineHeight: 1.3 },
-            { id: 'ed-body-2', type: 'text', content: 'Body copy — paragraph to confirm.', fontSize: 17, color: COLOR.textSecondary, lineHeight: 1.7 },
+            { id: 'ed-kicker', type: 'text', content: 'Eyebrow — category', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.accent, letterSpacing: 1 },
+            { id: 'ed-title', type: 'text', content: 'Headline', fontSize: TYPE.display, fontWeight: 700, color: COLOR.textPrimary, lineHeight: 1.2 },
+            { id: 'ed-meta', type: 'text', content: 'Byline — author · date', fontSize: TYPE.textSm, color: COLOR.textSecondary },
+            { id: 'ed-lead', type: 'text', content: 'Lead paragraph — set up the piece in two or three sentences.', fontSize: TYPE.textLg, color: COLOR.textSecondary, lineHeight: 1.6 },
+            { id: 'ed-h2-1', type: 'text', content: 'Section heading', fontSize: TYPE.heading, fontWeight: 600, color: COLOR.textPrimary, lineHeight: 1.3 },
+            { id: 'ed-body-1', type: 'text', content: 'Body copy — paragraph to confirm.', fontSize: TYPE.textLg, color: COLOR.textSecondary, lineHeight: 1.7 },
+            { id: 'ed-h2-2', type: 'text', content: 'Section heading', fontSize: TYPE.heading, fontWeight: 600, color: COLOR.textPrimary, lineHeight: 1.3 },
+            { id: 'ed-body-2', type: 'text', content: 'Body copy — paragraph to confirm.', fontSize: TYPE.textLg, color: COLOR.textSecondary, lineHeight: 1.7 },
           ],
         },
       ],
@@ -576,7 +586,7 @@ const splitWorkbench: Structure = {
           stroke: COLOR.border,
           strokeWidth: 1,
           children: [
-            { id: 'sw-brand', type: 'text', content: 'Brand', fontSize: 16, fontWeight: 700, color: COLOR.textPrimary },
+            { id: 'sw-brand', type: 'text', content: 'Brand', fontSize: TYPE.body, fontWeight: 700, color: COLOR.textPrimary },
             navItem('sw-nav-1', 'Nav item', 'layout-dashboard'),
             navItem('sw-nav-2', 'Nav item', 'folder'),
             navItem('sw-nav-3', 'Nav item', 'users'),
@@ -602,7 +612,7 @@ const splitWorkbench: Structure = {
               justifyContent: 'space-between',
               alignItems: 'center',
               children: [
-                { id: 'sw-title', type: 'text', content: 'Headline', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary },
+                { id: 'sw-title', type: 'text', content: 'Headline', fontSize: TYPE.title, fontWeight: 700, color: COLOR.textPrimary },
                 button('sw-action', 'Primary action', COLOR.accent, COLOR.bgPrimary),
               ],
             },
@@ -619,7 +629,7 @@ const splitWorkbench: Structure = {
               layout: 'vertical',
               alignItems: 'center',
               justifyContent: 'center',
-              children: [{ id: 'sw-canvas-label', type: 'text', content: 'Body copy — main work area', fontSize: 16, color: COLOR.textSecondary }],
+              children: [{ id: 'sw-canvas-label', type: 'text', content: 'Body copy — main work area', fontSize: TYPE.body, color: COLOR.textSecondary }],
             },
           ],
         },
@@ -656,8 +666,8 @@ const catalogue: Structure = {
           alignItems: 'center',
           responsive: 'stack',
           children: [
-            { id: 'cat-title', type: 'text', content: 'Headline', fontSize: 32, fontWeight: 700, color: COLOR.textPrimary },
-            { id: 'cat-filter', type: 'text', content: 'Filter — options', fontSize: 16, color: COLOR.textSecondary },
+            { id: 'cat-title', type: 'text', content: 'Headline', fontSize: TYPE.title, fontWeight: 700, color: COLOR.textPrimary },
+            { id: 'cat-filter', type: 'text', content: 'Filter — options', fontSize: TYPE.body, color: COLOR.textSecondary },
           ],
         },
         {
@@ -707,7 +717,7 @@ const dashboard: Structure = {
                       fill: COLOR.accent, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
                       children: [{ id: 'db-brand-icon', type: 'icon', icon: 'zap', iconSize: 16, iconColor: COLOR.bgPrimary }],
                     },
-                    { id: 'db-brand-name', type: 'text', content: 'Brand', fontSize: 16, fontWeight: 700, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+                    { id: 'db-brand-name', type: 'text', content: 'Brand', fontSize: TYPE.body, fontWeight: 700, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
                   ],
                 },
                 navGroup('db-group-main', 'Workspace', [
@@ -735,8 +745,8 @@ const dashboard: Structure = {
                 {
                   id: 'db-account-copy', type: 'frame', name: 'Identity', layout: 'vertical', minWidth: 0,
                   children: [
-                    { id: 'db-account-name', type: 'text', content: 'Account — TBD', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
-                    { id: 'db-account-role', type: 'text', content: 'Workspace — TBD', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+                    { id: 'db-account-name', type: 'text', content: 'Account — TBD', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+                    { id: 'db-account-role', type: 'text', content: 'Workspace — TBD', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
                   ],
                 },
                 { id: 'db-account-menu', type: 'icon', icon: 'chevrons-up-down', iconSize: 14, iconColor: COLOR.textSecondary },
@@ -762,7 +772,7 @@ const dashboard: Structure = {
                       fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, overflow: 'hidden',
                       children: [
                         { id: 'db-search-icon', type: 'icon', icon: 'search', iconSize: 15, iconColor: COLOR.textSecondary },
-                        { id: 'db-search-text', type: 'text', content: 'Search', fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+                        { id: 'db-search-text', type: 'text', content: 'Search', fontSize: TYPE.textSm, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
                       ],
                     },
                     {
@@ -794,7 +804,7 @@ const dashboard: Structure = {
                       id: 'db-chart-head', type: 'frame', name: 'Chart header', width: '100%', layout: 'horizontal',
                       alignItems: 'center', justifyContent: 'space-between',
                       children: [
-                        { id: 'db-chart-title', type: 'text', content: 'Overview', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
+                        { id: 'db-chart-title', type: 'text', content: 'Overview', fontSize: TYPE.body, fontWeight: 600, color: COLOR.textPrimary },
                         {
                           id: 'db-legend', type: 'frame', name: 'Legend', layout: 'horizontal', alignItems: 'center', gap: SPACE.sm,
                           children: [
@@ -802,14 +812,14 @@ const dashboard: Structure = {
                               id: 'db-legend-a', type: 'frame', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
                               children: [
                                 { id: 'db-legend-a-dot', type: 'ellipse', width: 8, height: 8, fill: COLOR.accent },
-                                { id: 'db-legend-a-text', type: 'text', content: 'Series A — TBD', fontSize: 12, color: COLOR.textSecondary },
+                                { id: 'db-legend-a-text', type: 'text', content: 'Series A — TBD', fontSize: TYPE.caption, color: COLOR.textSecondary },
                               ],
                             },
                             {
                               id: 'db-legend-b', type: 'frame', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
                               children: [
                                 { id: 'db-legend-b-dot', type: 'ellipse', width: 8, height: 8, fill: COLOR.border },
-                                { id: 'db-legend-b-text', type: 'text', content: 'Baseline — TBD', fontSize: 12, color: COLOR.textSecondary },
+                                { id: 'db-legend-b-text', type: 'text', content: 'Baseline — TBD', fontSize: TYPE.caption, color: COLOR.textSecondary },
                               ],
                             },
                           ],
@@ -833,7 +843,7 @@ const dashboard: Structure = {
                   gap: SPACE.md, padding: SPACE.lg, cornerRadius: RADIUS.lg,
                   fill: COLOR.bgSurface, stroke: COLOR.border, strokeWidth: 1, shadow: ELEV.flat,
                   children: [
-                    { id: 'db-side-title', type: 'text', content: 'Recent activity', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
+                    { id: 'db-side-title', type: 'text', content: 'Recent activity', fontSize: TYPE.body, fontWeight: 600, color: COLOR.textPrimary },
                     activityRow('db-act-1', 'git-commit'),
                     activityRow('db-act-2', 'user-plus'),
                     activityRow('db-act-3', 'file-text'),
@@ -867,8 +877,8 @@ const auth: Structure = {
             {
               id: 'au-head', type: 'frame', width: '100%', layout: 'vertical', gap: SPACE.xs,
               children: [
-                { id: 'au-title', type: 'text', content: 'Sign in', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary },
-                { id: 'au-sub', type: 'text', content: 'Body copy — one supporting line.', fontSize: 14, color: COLOR.textSecondary, lineHeight: 1.5 },
+                { id: 'au-title', type: 'text', content: 'Sign in', fontSize: TYPE.title, fontWeight: 700, color: COLOR.textPrimary },
+                { id: 'au-sub', type: 'text', content: 'Body copy — one supporting line.', fontSize: TYPE.textSm, color: COLOR.textSecondary, lineHeight: 1.5 },
               ],
             },
             {
@@ -878,9 +888,9 @@ const auth: Structure = {
             {
               id: 'au-submit', type: 'frame', name: 'Submit', width: '100%', layout: 'horizontal',
               alignItems: 'center', justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
-              children: [{ id: 'au-submit-label', type: 'text', content: 'Continue', fontSize: 16, fontWeight: 600, color: COLOR.bgPrimary }],
+              children: [{ id: 'au-submit-label', type: 'text', content: 'Continue', fontSize: TYPE.body, fontWeight: 600, color: COLOR.bgPrimary }],
             },
-            { id: 'au-alt', type: 'text', content: 'Secondary link', fontSize: 14, fontWeight: 500, color: COLOR.accent, textAlign: 'center' },
+            { id: 'au-alt', type: 'text', content: 'Secondary link', fontSize: TYPE.textSm, fontWeight: 500, color: COLOR.accent, textAlign: 'center' },
           ],
         },
       ],
@@ -903,8 +913,8 @@ const pricing: Structure = {
         {
           id: 'pr-head', type: 'frame', name: 'Header', width: '100%', layout: 'vertical', gap: SPACE.md, alignItems: 'center',
           children: [
-            { id: 'pr-title', type: 'text', content: 'Pricing', fontSize: 40, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.2 },
-            { id: 'pr-sub', type: 'text', content: 'Body copy — one supporting line about the plans.', fontSize: 16, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 560 },
+            { id: 'pr-title', type: 'text', content: 'Pricing', fontSize: TYPE.display, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center', lineHeight: 1.2 },
+            { id: 'pr-sub', type: 'text', content: 'Body copy — one supporting line about the plans.', fontSize: TYPE.body, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 560 },
           ],
         },
         {
@@ -927,8 +937,8 @@ function settingsSection(id: string, title: string, rows: SceneNode[]): SceneNod
       {
         id: `${id}-head`, type: 'frame', name: 'Section header', width: '100%', layout: 'vertical', gap: SPACE.xxs,
         children: [
-          { id: `${id}-title`, type: 'text', content: title, fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
-          { id: `${id}-desc`, type: 'text', content: 'Section description — to confirm', fontSize: 14, color: COLOR.textSecondary },
+          { id: `${id}-title`, type: 'text', content: title, fontSize: TYPE.body, fontWeight: 600, color: COLOR.textPrimary },
+          { id: `${id}-desc`, type: 'text', content: 'Section description — to confirm', fontSize: TYPE.textSm, color: COLOR.textSecondary },
         ],
       },
       {
@@ -967,7 +977,7 @@ const settings: Structure = {
             {
               id: 'st-danger', type: 'frame', name: 'Danger zone', width: '100%', layout: 'vertical', gap: SPACE.sm,
               children: [
-                { id: 'st-danger-title', type: 'text', content: 'Danger zone', fontSize: 16, fontWeight: 600, color: '$danger' },
+                { id: 'st-danger-title', type: 'text', content: 'Danger zone', fontSize: TYPE.body, fontWeight: 600, color: '$danger' },
                 {
                   id: 'st-danger-card', type: 'frame', name: 'Card', width: '100%', layout: 'horizontal',
                   alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md, padding: SPACE.lg,
@@ -976,15 +986,15 @@ const settings: Structure = {
                     {
                       id: 'st-danger-copy', type: 'frame', name: 'Copy', layout: 'vertical', gap: SPACE.xxs,
                       children: [
-                        { id: 'st-danger-label', type: 'text', content: 'Destructive action — TBD', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
-                        { id: 'st-danger-desc', type: 'text', content: 'Consequence — to confirm', fontSize: 14, color: COLOR.textSecondary },
+                        { id: 'st-danger-label', type: 'text', content: 'Destructive action — TBD', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.textPrimary },
+                        { id: 'st-danger-desc', type: 'text', content: 'Consequence — to confirm', fontSize: TYPE.textSm, color: COLOR.textSecondary },
                       ],
                     },
                     {
                       id: 'st-danger-btn', type: 'frame', name: 'Destructive button', layout: 'horizontal', alignItems: 'center',
                       justifyContent: 'center', padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm,
                       fill: 'transparent', stroke: '$danger', strokeWidth: 1,
-                      children: [{ id: 'st-danger-btn-label', type: 'text', content: 'Delete — TBD', fontSize: 14, fontWeight: 600, color: '$danger' }],
+                      children: [{ id: 'st-danger-btn-label', type: 'text', content: 'Delete — TBD', fontSize: TYPE.textSm, fontWeight: 600, color: '$danger' }],
                     },
                   ],
                 },
@@ -1023,12 +1033,12 @@ const onboarding: Structure = {
           layout: 'vertical', alignItems: 'center', justifyContent: 'center',
           children: [{ id: 'ob-glyph-icon', type: 'icon', icon: 'sparkles', iconSize: 28, iconColor: COLOR.accent }],
         },
-        { id: 'ob-title', type: 'text', content: 'Get started', fontSize: 28, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center' },
-        { id: 'ob-body', type: 'text', content: 'Body copy — explain the empty state and the next step in a sentence.', fontSize: 16, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 420 },
+        { id: 'ob-title', type: 'text', content: 'Get started', fontSize: TYPE.title, fontWeight: 700, color: COLOR.textPrimary, textAlign: 'center' },
+        { id: 'ob-body', type: 'text', content: 'Body copy — explain the empty state and the next step in a sentence.', fontSize: TYPE.body, color: COLOR.textSecondary, textAlign: 'center', lineHeight: 1.5, maxWidth: 420 },
         {
           id: 'ob-cta', type: 'frame', name: 'Primary action', layout: 'horizontal', alignItems: 'center',
           justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
-          children: [{ id: 'ob-cta-label', type: 'text', content: 'Primary action', fontSize: 16, fontWeight: 600, color: COLOR.bgPrimary }],
+          children: [{ id: 'ob-cta-label', type: 'text', content: 'Primary action', fontSize: TYPE.body, fontWeight: 600, color: COLOR.bgPrimary }],
         },
       ],
     },
@@ -1049,13 +1059,13 @@ const formField: Structure = {
   nodes: [{
     id: 'ff', type: 'frame', name: 'Form field', width: '100%', layout: 'vertical', gap: SPACE.xs,
     children: [
-      { id: 'ff-label', type: 'text', content: 'Field label', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
+      { id: 'ff-label', type: 'text', content: 'Field label', fontSize: TYPE.label, fontWeight: 600, color: COLOR.textPrimary },
       {
         id: 'ff-input', type: 'frame', name: 'Input', width: '100%', height: 44, layout: 'horizontal', alignItems: 'center',
         padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
-        children: [{ id: 'ff-placeholder', type: 'text', content: 'Placeholder — to confirm', fontSize: 16, color: COLOR.textSecondary }],
+        children: [{ id: 'ff-placeholder', type: 'text', content: 'Placeholder — to confirm', fontSize: TYPE.body, color: COLOR.textSecondary }],
       },
-      { id: 'ff-help', type: 'text', content: 'Help text — to confirm', fontSize: 12, color: COLOR.textSecondary },
+      { id: 'ff-help', type: 'text', content: 'Help text — to confirm', fontSize: TYPE.caption, color: COLOR.textSecondary },
     ],
   }],
 };
@@ -1072,8 +1082,8 @@ const toggleRow: Structure = {
       {
         id: 'tr-copy', type: 'frame', name: 'Copy', layout: 'vertical', gap: SPACE.xs2,
         children: [
-          { id: 'tr-label', type: 'text', content: 'Setting label', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary },
-          { id: 'tr-desc', type: 'text', content: 'Setting description — to confirm', fontSize: 12, color: COLOR.textSecondary },
+          { id: 'tr-label', type: 'text', content: 'Setting label', fontSize: TYPE.label, fontWeight: 600, color: COLOR.textPrimary },
+          { id: 'tr-desc', type: 'text', content: 'Setting description — to confirm', fontSize: TYPE.caption, color: COLOR.textSecondary },
         ],
       },
       { id: 'tr-toggle', type: 'toggle', checked: true },
@@ -1097,11 +1107,11 @@ const toolbar: Structure = {
     justifyContent: 'space-between', gap: SPACE.md,
     children: [
       {
-        id: 'tb-search', type: 'frame', name: 'Search', width: 280, height: 36, layout: 'horizontal', alignItems: 'center',
+        id: 'tb-search', type: 'frame', name: 'Search', width: 280, height: 36, minWidth: 0, overflow: 'hidden', layout: 'horizontal', alignItems: 'center',
         gap: SPACE.xs, padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm, fill: COLOR.bgElevated, stroke: COLOR.border, strokeWidth: 1,
         children: [
           { id: 'tb-search-icon', type: 'icon', icon: 'search', iconSize: 16, iconColor: COLOR.textSecondary },
-          { id: 'tb-search-text', type: 'text', content: 'Search — to confirm', fontSize: 13, color: COLOR.textSecondary },
+          { id: 'tb-search-text', type: 'text', content: 'Search — to confirm', fontSize: TYPE.textSm, color: COLOR.textSecondary, textOverflow: 'ellipsis', minWidth: 0 },
         ],
       },
       {
@@ -1123,14 +1133,14 @@ function tableRow(id: string): SceneNode {
     padding: [SPACE.xs, SPACE.md], gap: SPACE.md, stroke: COLOR.border, strokeWidth: 1,
     children: [
       {
-        id: `${id}-identity`, type: 'frame', width: '34%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
+        id: `${id}-identity`, type: 'frame', width: '34%', minWidth: 0, overflow: 'hidden', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
         children: [
           { id: `${id}-avatar`, type: 'ellipse', width: 32, height: 32, fill: COLOR.bgElevated },
           {
-            id: `${id}-id-copy`, type: 'frame', name: 'Identity', layout: 'vertical',
+            id: `${id}-id-copy`, type: 'frame', name: 'Identity', layout: 'vertical', minWidth: 0,
             children: [
-              { id: `${id}-name`, type: 'text', content: 'Name — to confirm', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
-              { id: `${id}-email`, type: 'text', content: 'email — to confirm', fontSize: 12, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+              { id: `${id}-name`, type: 'text', content: 'Name — to confirm', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+              { id: `${id}-email`, type: 'text', content: 'email — to confirm', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
             ],
           },
         ],
@@ -1140,19 +1150,19 @@ function tableRow(id: string): SceneNode {
         children: [{
           id: `${id}-role-chip`, type: 'frame', layout: 'horizontal', alignItems: 'center', padding: [SPACE.xs2, SPACE.xs],
           cornerRadius: 999, fill: COLOR.bgElevated,
-          children: [{ id: `${id}-role-text`, type: 'text', content: 'Role', fontSize: 12, color: COLOR.textSecondary }],
+          children: [{ id: `${id}-role-text`, type: 'text', content: 'Role', fontSize: TYPE.caption, color: COLOR.textSecondary }],
         }],
       },
       {
         id: `${id}-status`, type: 'frame', width: '18%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
         children: [
           { id: `${id}-status-dot`, type: 'ellipse', width: 8, height: 8, fill: '$success' },
-          { id: `${id}-status-text`, type: 'text', content: 'Status', fontSize: 12, color: COLOR.textSecondary },
+          { id: `${id}-status-text`, type: 'text', content: 'Status', fontSize: TYPE.caption, color: COLOR.textSecondary },
         ],
       },
       {
         id: `${id}-amount`, type: 'frame', width: '18%', layout: 'horizontal', justifyContent: 'end',
-        children: [{ id: `${id}-amount-text`, type: 'text', content: 'Amount — TBD', fontSize: 14, color: COLOR.textPrimary, tabularNums: true }],
+        children: [{ id: `${id}-amount-text`, type: 'text', content: 'Amount — TBD', fontSize: TYPE.textSm, color: COLOR.textPrimary, tabularNums: true }],
       },
       {
         id: `${id}-actions`, type: 'frame', width: '12%', layout: 'horizontal', justifyContent: 'end',
@@ -1164,8 +1174,8 @@ function tableRow(id: string): SceneNode {
 
 function tableHeaderCell(id: string, label: string, width: string, alignEnd = false): SceneNode {
   return {
-    id, type: 'frame', width, layout: 'horizontal', ...(alignEnd ? { justifyContent: 'end' as const } : {}),
-    children: [{ id: `${id}-text`, type: 'text', content: label, fontSize: 12, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: COLOR.textSecondary, tabularNums: true }],
+    id, type: 'frame', width, minWidth: 0, overflow: 'hidden', layout: 'horizontal', ...(alignEnd ? { justifyContent: 'end' as const } : {}),
+    children: [{ id: `${id}-text`, type: 'text', content: label, fontSize: TYPE.caption, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: COLOR.textSecondary, tabularNums: true, textOverflow: 'ellipsis', minWidth: 0 }],
   };
 }
 
@@ -1195,7 +1205,7 @@ const dataTable: Structure = {
         id: 'dt-footer', type: 'frame', name: 'Pagination', width: '100%', layout: 'horizontal',
         alignItems: 'center', justifyContent: 'space-between', padding: [SPACE.xs, SPACE.md], fill: COLOR.bgElevated,
         children: [
-          { id: 'dt-count', type: 'text', content: 'Row count — TBD', fontSize: 12, color: COLOR.textSecondary, tabularNums: true },
+          { id: 'dt-count', type: 'text', content: 'Row count — TBD', fontSize: TYPE.caption, color: COLOR.textSecondary, tabularNums: true },
           {
             id: 'dt-pager', type: 'frame', name: 'Pager', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
             children: [
@@ -1233,8 +1243,8 @@ const emptyState: Structure = {
     gap: SPACE.xs, padding: [SPACE.xl2, SPACE.lg],
     children: [
       { id: 'es-icon', type: 'icon', icon: 'inbox', iconSize: 28, iconColor: COLOR.textSecondary },
-      { id: 'es-title', type: 'text', content: 'Nothing here yet', fontSize: 16, fontWeight: 600, color: COLOR.textPrimary },
-      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: 12, color: COLOR.textSecondary },
+      { id: 'es-title', type: 'text', content: 'Nothing here yet', fontSize: TYPE.body, fontWeight: 600, color: COLOR.textPrimary },
+      { id: 'es-hint', type: 'text', content: 'Items you create will show up here — to confirm', fontSize: TYPE.caption, color: COLOR.textSecondary },
       {
         id: 'es-cta', type: 'frame', name: 'CTA', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs,
         padding: [SPACE.xs, SPACE.md], cornerRadius: RADIUS.sm, fill: COLOR.accent, width: 'fit-content',
@@ -1243,7 +1253,7 @@ const emptyState: Structure = {
           // dark accent in light mode, near-black on the light accent in dark
           // mode (the tier() CTA convention — a literal white breaks in dark).
           { id: 'es-cta-icon', type: 'icon', icon: 'plus', iconSize: 14, iconColor: COLOR.bgPrimary },
-          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: 14, fontWeight: 600, color: COLOR.bgPrimary },
+          { id: 'es-cta-label', type: 'text', content: 'Create item', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.bgPrimary },
         ],
       },
     ],
@@ -1363,7 +1373,7 @@ const statusChip: Structure = {
     gap: SPACE.xs2, padding: [2, SPACE.xs], cornerRadius: 999, fill: TINT.success.bg, overflow: 'hidden',
     children: [
       { id: 'chip-icon', type: 'icon', icon: 'circle-check', iconSize: 12, iconColor: TINT.success.ink },
-      { id: 'chip-label', type: 'text', content: 'Status — TBD', fontSize: 12, fontWeight: 600, color: TINT.success.ink, textOverflow: 'ellipsis' },
+      { id: 'chip-label', type: 'text', content: 'Status — TBD', fontSize: TYPE.caption, fontWeight: 600, color: TINT.success.ink, textOverflow: 'ellipsis' },
     ],
   }],
 };
@@ -1379,15 +1389,15 @@ const segmentedControl: Structure = {
       {
         id: 'seg-a', type: 'frame', name: 'Segment A', layout: 'horizontal', padding: [SPACE.xs2, SPACE.sm], cornerRadius: 6,
         fill: COLOR.bgSurface, shadow: ELEV.flat,
-        children: [{ id: 'seg-a-label', type: 'text', content: 'Option A', fontSize: 12, fontWeight: 600, color: COLOR.textPrimary, tabularNums: true }],
+        children: [{ id: 'seg-a-label', type: 'text', content: 'Option A', fontSize: TYPE.caption, fontWeight: 600, color: COLOR.textPrimary, tabularNums: true }],
       },
       {
         id: 'seg-b', type: 'frame', name: 'Segment B', layout: 'horizontal', padding: [SPACE.xs2, SPACE.sm], cornerRadius: 6,
-        children: [{ id: 'seg-b-label', type: 'text', content: 'Option B', fontSize: 12, fontWeight: 500, color: COLOR.textSecondary, tabularNums: true }],
+        children: [{ id: 'seg-b-label', type: 'text', content: 'Option B', fontSize: TYPE.caption, fontWeight: 500, color: COLOR.textSecondary, tabularNums: true }],
       },
       {
         id: 'seg-c', type: 'frame', name: 'Segment C', layout: 'horizontal', padding: [SPACE.xs2, SPACE.sm], cornerRadius: 6,
-        children: [{ id: 'seg-c-label', type: 'text', content: 'Option C', fontSize: 12, fontWeight: 500, color: COLOR.textSecondary, tabularNums: true }],
+        children: [{ id: 'seg-c-label', type: 'text', content: 'Option C', fontSize: TYPE.caption, fontWeight: 500, color: COLOR.textSecondary, tabularNums: true }],
       },
     ],
   }],
@@ -1400,9 +1410,9 @@ const breadcrumb: Structure = {
   nodes: [{
     id: 'crumb', type: 'frame', name: 'Breadcrumb', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
     children: [
-      { id: 'crumb-parent', type: 'text', content: 'Parent', fontSize: 14, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
+      { id: 'crumb-parent', type: 'text', content: 'Parent', fontSize: TYPE.textSm, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
       { id: 'crumb-sep', type: 'icon', icon: 'chevron-right', iconSize: 14, iconColor: COLOR.textSecondary },
-      { id: 'crumb-current', type: 'text', content: 'Current page', fontSize: 14, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
+      { id: 'crumb-current', type: 'text', content: 'Current page', fontSize: TYPE.textSm, fontWeight: 600, color: COLOR.textPrimary, textOverflow: 'ellipsis' },
     ],
   }],
 };
@@ -1412,9 +1422,9 @@ const initialsAvatar: Structure = {
   kind: 'component',
   description: 'An initials avatar on the tint pair: tinted circle + two-letter monogram in the matching ink. Size/tint/initials via the idMap.',
   nodes: [{
-    id: 'av', type: 'frame', name: 'Avatar', width: 32, height: 32, cornerRadius: 999,
+    id: 'av', type: 'frame', name: 'Avatar', width: 32, height: 32, cornerRadius: 999, overflow: 'hidden',
     fill: TINT.accent.bg, layout: 'vertical', alignItems: 'center', justifyContent: 'center',
-    children: [{ id: 'av-initials', type: 'text', content: 'AB', fontSize: 12, fontWeight: 700, color: TINT.accent.ink }],
+    children: [{ id: 'av-initials', type: 'text', content: 'AB', fontSize: TYPE.caption, fontWeight: 700, color: TINT.accent.ink, textOverflow: 'ellipsis', minWidth: 0 }],
   }],
 };
 
@@ -1508,8 +1518,26 @@ const DEFAULT_SCAFFOLD_ELEVATION: Record<string, Array<{ x: number; y: number; b
     { x: 0, y: 2, blur: 4, spread: -1, color: 'rgba(16, 24, 40, 0.08)' },
   ],
 };
-const DEFAULT_SCAFFOLD_TYPOGRAPHY: Record<string, { fontSize: number; fontWeight?: number; letterSpacing?: number }> = {
+/** Phase 29 slice C — scaffolds reference the TYPE ROLES rather than literal
+ * pixel sizes, so a stamp lands on whatever scale the canvas actually has.
+ * These defaults are the pre-29 literals, seeded only when the role isn't
+ * already resolvable, so an unthemed canvas keeps its old proportions while a
+ * generated design system re-voices every stamp — family, weight and tracking
+ * included, which a literal size could never carry.
+ *
+ * Sizes that shared a role collapse to one value here: the display tier ran
+ * 40/44/48/56 across four scaffolds and is now a single `$display`. That is the
+ * intended trade (spec C6) — the pattern gate re-baselines rather than holding
+ * byte-identical renders. */
+const DEFAULT_SCAFFOLD_TYPOGRAPHY: Record<string, { fontSize: number; fontWeight?: number; letterSpacing?: number; lineHeight?: number }> = {
+  display: { fontSize: 40, fontWeight: 700, letterSpacing: -0.5, lineHeight: 1.15 },
   title: { fontSize: 28, fontWeight: 700, letterSpacing: -0.5 },   // page titles — pre-27 literal + display tracking
+  heading: { fontSize: 26, fontWeight: 600, lineHeight: 1.3 },
+  'text-lg': { fontSize: 20, lineHeight: 1.35 },
+  body: { fontSize: 16, lineHeight: 1.5 },
+  'text-sm': { fontSize: 14, lineHeight: 1.5 },
+  label: { fontSize: 14, lineHeight: 1.5 },
+  caption: { fontSize: 12, lineHeight: 1.5 },
 };
 
 /** Node fields that may carry a `$color` token ref (the theming split). */
