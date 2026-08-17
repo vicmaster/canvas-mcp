@@ -386,6 +386,7 @@ Render canvas to PNG (returned as base64 image).
 | `nodeId` | string? | Specific node to capture |
 | `width` | number? | Viewport width (default 1440) |
 | `height` | number? | Viewport height (default 900) |
+| `fullPage` | boolean? | Capture the whole design instead of one viewport — default false, so existing captures (diffs, exports, responsive sets, the pattern gate) are byte-identical. A canvas taller than its artboard otherwise cuts off at the artboard height; before this, the only way to see the rest was editing the root height by hand |
 | `scale` | number? | Device scale (default 2) |
 | `theme` | string? | `"dark"` renders the design system's dark token layer (`dark.colors`/`dark.elevation` overrides); default light — a no-op without a dark layer |
 
@@ -982,7 +983,7 @@ Closes the critique loop (Phase 13). Judges the canvas against the rubric; if an
 
 ## Resources
 
-- **`framesmith://guidelines`** — markdown authoring guide: width strategies (fixed / percentage / fluid+cap / floor / fit-content), responsive hint semantics (`stack` / `wrap` / `fixed`), common patterns (pricing tiers, two-column hero, tag list, toolbar), and anti-patterns. Source: [`docs/GUIDELINES.md`](docs/GUIDELINES.md).
+- **`framesmith://guidelines`** — markdown authoring guide: width strategies (fixed / percentage / fluid+cap / floor / fit-content), responsive hint semantics (`stack` / `wrap`), common patterns (pricing tiers, two-column hero, tag list, toolbar), and anti-patterns. Source: [`docs/GUIDELINES.md`](docs/GUIDELINES.md).
 
 ## Benchmark
 

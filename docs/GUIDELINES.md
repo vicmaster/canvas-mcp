@@ -34,6 +34,8 @@ Pick the right `width` per node — this is the single biggest lever for respons
 
 **Default to fluid.** Reach for fixed pixel widths only when the content genuinely shouldn't scale.
 
+**Artboard height is a viewport, not a limit.** The root's `height` sizes the default `screenshot` capture, but content taller than it is normal — it scrolls on a real page, and a `clip` finding from `canvas_stress` for exactly that case is `info`, not a problem to fix. To actually see past the artboard (a long page, a design that grew under stress content), pass `fullPage: true` to `screenshot` instead of editing the root height by hand.
+
 ## Responsive hints
 
 Set `responsive` on **container nodes** (frames with `layout: "horizontal"` or `layout: "grid"` and children). The renderer emits the right media-query rules — flex-wrap for horizontal containers, a single-column collapse with spans reset for grid.
@@ -42,7 +44,6 @@ Set `responsive` on **container nodes** (frames with `layout: "horizontal"` or `
 |---|---|---|
 | `responsive: "stack"` | Horizontal container flips to vertical below 768px; a `grid` container collapses to one column (spans reset) | Multi-column rows that should become a single column on mobile. **This is the most common case** — almost every card row, hero with side-by-side panels, footer link group |
 | `responsive: "wrap"` | Children wrap to the next line instead of overflowing | Tag clouds, badge groups, card grids that can have an irregular last row |
-| `responsive: "fixed"` | Never reflows | Toolbars, navbars, fixed-position headers — anywhere reflow would break the layout intent |
 
 ## Common patterns
 
@@ -83,7 +84,7 @@ side=I(grid, { type: "frame", height: 280, width: "100%", padding: 24, fill: "$b
 **Toolbar** (never reflows):
 
 ```js
-bar=I("document", { type: "frame", layout: "horizontal", gap: 16, responsive: "fixed", padding: 16, alignItems: "center" })
+bar=I("document", { type: "frame", layout: "horizontal", gap: 16, padding: 16, alignItems: "center" })
 ```
 
 ### Charts (data in, SVG out)
