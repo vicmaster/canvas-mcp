@@ -25,6 +25,7 @@ import { listFeedback, resolveFeedback, openFeedbackCount, appendFeedbackDirecti
 import { importHtml, importUrl, renderImportedTree, snapToTokens } from './import.js';
 import { computeStructuralDrift, expandInstances } from './drift.js';
 import { applyPerturbation, compareLayouts, PERTURBATION_NAMES, type PerturbationName } from './stress.js';
+import { buildEvaluateDirective } from './directive.js';
 import { generateTypeScale, generateSpaceScale, resolveRatio, type RatioName } from './scales.js';
 import { generateColorSystem } from './color-system.js';
 import { generateDesignSystem, PERSONALITY_NAMES, type PersonalityName } from './design-language.js';
@@ -52,7 +53,7 @@ Design tokens are a layered system (workspace > project > canvas). Reference the
 
 Your job is to craft beautiful UI with real UX — designs a designer would sign off on — not wireframes. The bar is non-negotiable, and polishing to it is YOUR work, never the user's.
 
-Core loop: start from a taste-vetted pattern (list_structures → apply_structure) — never a blank canvas → adapt at one target width (referencing $tokens), using framesmith's real capabilities below → screenshot → canvas_evaluate → resolve EVERY comment it returns (canvas_autofix for the mechanical subset, batch_design for the rest) → re-evaluate → repeat until the inspector is CLEAN (zero comments) and the score is > 95. ONLY THEN present to the user — and when an LLM API key is configured, make the vision critique the STANDARD final step, not an exception: canvas_evaluate mode "llm" scores the render on the fixed five-axis rubric, canvas_revise addresses the failing axes, re-judge until it passes. The heuristic gate is the floor; the critique loop is the ceiling. Never show a design with open comments or a sub-bar score — the evaluate result tells you when it's safe to present. The "Designing with taste" guidelines cover the do's (one focal point, real hierarchy, one type + spacing scale, restraint); the cliche category catches the don'ts.
+Core loop: start from a taste-vetted pattern (list_structures → apply_structure) — never a blank canvas → adapt at one target width (referencing $tokens), using framesmith's real capabilities below → screenshot → canvas_evaluate → resolve EVERY comment it returns (canvas_autofix for the mechanical subset, batch_design for the rest) → re-evaluate → repeat until the inspector is CLEAN — zero warnings, zero errors, zero cliché tells. That, not the score, is what gates presenting; the score (aim for > 95) is always reported and is the quality bar to climb toward, but once nothing is left to resolve, a sub-bar score alone doesn't withhold readiness — the directive says so explicitly and names the advisories as the remaining lever. ONLY once CLEAN present to the user — and when an LLM API key is configured, make the vision critique the STANDARD final step, not an exception: canvas_evaluate mode "llm" scores the render on the fixed five-axis rubric, canvas_revise addresses the failing axes, re-judge until it passes. The heuristic gate is the floor; the critique loop is the ceiling. Never show a design with open comments — the evaluate result tells you when it's safe to present. The "Designing with taste" guidelines cover the do's (one focal point, real hierarchy, one type + spacing scale, restraint); the cliche category catches the don'ts.
 
 A data screen isn't done at one static frame with ideal data. DESIGN EVERY STATE: tables need designed "empty" + "loading" variants, forms need "error" — the coverage category warns until they exist, and canvas_add_variant + the empty-state / skeleton-table / skeleton-card / skeleton-stat-card scaffolds make each one a clone plus a stamp. SURVIVE EVERY STRING: run canvas_stress before presenting a data screen — it renders the too-long name, the German label, the "999+" badge, and empty/tripled tables, and reports what clipped or overflowed by node id (fix with fluid widths / minWidth or minHeight floors / wrapping, then re-run until CLEAN).
 
@@ -102,7 +103,7 @@ const WORKFLOW_CHEATSHEET = [
   'Read the framesmith://guidelines resource before drawing (esp. "Designing with taste": one focal point, real hierarchy, one type + spacing scale, restraint).',
   'Author at one target width; reference tokens with $name (e.g. fill: "$surface").',
   'screenshot → review the render → iterate.',
-  'canvas_evaluate → resolve EVERY comment (canvas_autofix apply: true for the mechanical subset / batch_design for the rest) → re-evaluate → repeat until the inspector is CLEAN and the score is > 95. Only then present.',
+  'canvas_evaluate → resolve EVERY comment (canvas_autofix apply: true for the mechanical subset / batch_design for the rest) → re-evaluate → repeat until the inspector is CLEAN (zero warnings, zero errors, zero cliché tells). That\'s the readiness gate — not the score, which is always reported and worth climbing toward (aim for > 95) but no longer withholds readiness once nothing blocking is left. Only present once CLEAN.',
   'Final polish when an LLM API key is present: canvas_evaluate mode "llm" (the five-axis vision rubric) → canvas_revise on failing axes → re-judge. The heuristic gate is the floor; the critique loop is the ceiling — make it the standard last step before presenting, not an exception. Keyless sessions skip it (a note says so), nothing else changes.',
   'One canvas per screen / state; let the per-project build log nudge you to vary structure.',
   'Data screens: design every state — canvas_add_variant for "empty" / "loading" ("error" for forms) + the empty-state / skeleton-table / skeleton-stat-card scaffolds (coverage warns until they exist) — and run canvas_stress before presenting (fix clips/overflows with fluid widths, then re-run until CLEAN).',
@@ -114,7 +115,7 @@ const WORKFLOW_CHEATSHEET = [
 ];
 
 const GOTCHAS = [
-  'The bar: craft beautiful UI/UX a designer would sign off on, and polish to it YOURSELF — start from a pattern, use the whole toolkit (icons/fonts/controls/components), and run canvas_evaluate → resolve EVERY comment → re-evaluate until clean and > 95 BEFORE presenting. The evaluate result\'s "directive" field says when it\'s safe to present. Never show the user an unpolished design.',
+  'The bar: craft beautiful UI/UX a designer would sign off on, and polish to it YOURSELF — start from a pattern, use the whole toolkit (icons/fonts/controls/components), and run canvas_evaluate → resolve EVERY comment → re-evaluate until CLEAN (zero blocking issues) BEFORE presenting. Readiness turns on blocking findings, not the score — the score is always reported and worth climbing toward (aim for > 95), but a clean, sub-bar design is still READY. The evaluate result\'s "directive" field says when it\'s safe to present. Never show the user an unpolished design.',
   'Icons: Lucide ({ type: "icon", icon: "search" }) and Material Symbols (icon: "material:check", iconStyle outlined/rounded/sharp, "-fill" suffix for filled) render by name — never fake them with Unicode glyphs. Casing: use textTransform: "uppercase", not uppercased content.',
   'Controls: toggle / checkbox / radio / select are real node types with checked / disabled / value, token-styled — never assemble them from frames + ellipses.',
   'Bulk edits & queries: replace_matching_properties changes a property across every node matching a value predicate in one call (scope/type filters; dryRun previews the match set); find_nodes is the read-only twin — locate nodes by property/text/name and get ids + paths instead of guessing from read_nodes trees. canvas_autofix apply: true writes the whole mechanical fix set in one call.',
@@ -238,7 +239,7 @@ state is a free string; "empty", "loading", and "error" are the recommended voca
             state: canvas.metadata!.variant!.state,
             of: canvas.metadata!.variant!.of,
             idMap,
-            next: 'Design the state: edit via batch_design using the idMap ids (e.g. delete data rows and stamp an empty-state pattern), then evaluate as usual — variants hold the same > 95 bar.',
+            next: 'Design the state: edit via batch_design using the idMap ids (e.g. delete data rows and stamp an empty-state pattern), then evaluate as usual — variants hold the same bar: zero blocking issues to be READY, > 95 to be done.',
           }, null, 2) },
           ...(viewerUrl ? [{ type: 'text' as const, text: `View live: ${viewerUrl}/canvas/${canvas.id}` }] : []),
         ],
@@ -1963,7 +1964,7 @@ server.tool(
   - "fast": JSON-only, <100ms, deterministic heuristics only.
   - "detailed": adds Puppeteer-based pixel overlap detection in the consistency category.
   - "llm": fast-mode heuristics plus a vision-model critique against a FIXED rubric (provider picked from FRAMESMITH_LLM_PROVIDER env var, or whichever of ANTHROPIC_API_KEY / OPENAI_API_KEY is set). Adds an "llmCritique" field: { rubric: { hierarchy, execution, specificity, restraint, variety } each {score 1-5, rationale}, score (0-100 derived), summary, suggestions, needsRevision, failingAxes }. The verdict is stamped on the canvas (metadata.critique) + the per-project build log for auditability. Cost: one paid API call per invocation. To CLOSE the loop and auto-fix failing axes, use canvas_revise.
-Designed for generator-evaluator loops: generate with batch_design, evaluate with canvas_evaluate, fix issues targeting the returned nodeIds (canvas_autofix handles the mechanical subset). The result includes a "directive" field — a present/keep-working verdict: resolve EVERY comment and clear > 95 before showing the design to the user; the directive tells you when it's safe to present. An "openFeedback" field (when > 0) counts the user's open point-and-tell comments — they block presenting even at a READY score; read them with get_feedback and close them with resolve_feedback.
+Designed for generator-evaluator loops: generate with batch_design, evaluate with canvas_evaluate, fix issues targeting the returned nodeIds (canvas_autofix handles the mechanical subset). The result includes a "directive" field — a present/keep-working verdict: it turns on BLOCKING findings, not the score — resolve every error/warning/cliché tell and it reads READY. The score (aim for > 95) is always reported alongside it and is the quality bar to keep climbing, but once nothing blocking is left, a sub-bar score no longer withholds readiness; the directive says so explicitly and names the remaining advisory findings as the lever. An "openFeedback" field (when > 0) counts the user's open point-and-tell comments — they block presenting even at a READY directive; read them with get_feedback and close them with resolve_feedback.
 
 THE HEURISTIC DIRECTIVE IS THE PRESENTATION GATE. mode: "llm" adds optional depth (a vision-model rubric critique — composition, hierarchy, polish) on top; it requires an ANTHROPIC_API_KEY or OPENAI_API_KEY and fails gracefully without one — the FULL heuristic result still returns with an llmNote explaining what's missing, and the heuristic directive alone decides. Data-dense screens: pass genre: "dashboard" so the design's own realistic figures aren't flagged as fabricated; transactional screens (cart/checkout/order/billing) pass genre: "commerce" for the same reason (see the genre param).
 
@@ -2013,23 +2014,11 @@ The result's "genre" field (present whenever cliche ran) makes the genre decisio
       }
     }
 
-    // Action-oriented directive so the agent treats the result as a present/keep-
-    // working gate, not a readout. Blocking = a sub-bar score, any warning/error,
-    // OR any cliché tell (slop the user cares about, even at info severity). Pure
-    // advisories (e.g. "consider extracting components") are optional refinements.
-    const blocking = result.issues.filter(
-      (i) => i.category === 'cliche' || i.severity === 'error' || i.severity === 'warning',
-    ).length;
-    const optional = result.issues.length - blocking;
-    const ready = blocking === 0 && result.overallScore > 95;
-    const optTail = optional ? ` ${optional} optional refinement(s) noted (info) — address if easy, not required.` : '';
-    const baseDirective = ready
-      ? `READY TO PRESENT — ${result.overallScore}/100, no blocking issues.${optTail}`
-      : `NOT READY — ${result.overallScore}/100 with ${blocking} issue(s) to resolve${optional ? ` (+${optional} optional)` : ''}. Fix them now: canvas_autofix for the mechanical subset, batch_design for the rest (cliché tells included), then re-run canvas_evaluate. Repeat until there are zero warnings/cliché tells and the score is > 95. Do NOT show this design to the user yet.`;
-    // Slice C — open point-and-tell comments block presenting even at READY:
-    // the human's note outranks the heuristics.
+    // The presentation gate lives in src/directive.ts as a pure function — it is
+    // the most consequential sentence framesmith says to an agent, so it is
+    // testable rather than inline here.
     const openFeedback = openFeedbackCount(canvas);
-    const directive = appendFeedbackDirective(baseDirective, openFeedback);
+    const { directive } = buildEvaluateDirective(result, openFeedback);
 
     return {
       content: [{ type: 'text', text: JSON.stringify({ ...result, ...(llmNote ? { llmNote } : {}), ...(openFeedback > 0 ? { openFeedback } : {}), directive }, null, 2) }],

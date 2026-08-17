@@ -334,19 +334,37 @@ function checkSpacing(entries: NodeEntry[], variables: DesignVariables): CheckRe
     });
   }
 
+  // Phase 29 slice D (#194) — variety is measured against the DECLARED scale,
+  // not in the abstract. The old check asked every design to live on 4–6 unique
+  // spacing values, which contradicted framesmith's own generated scale: nine
+  // steps ship in space-3xs…space-3xl, so a design drawing exclusively from its
+  // own system could be told to consolidate for using the system. On the checkout
+  // attempt it still reported nine values after the authored set had been
+  // collapsed to six, with the residue coming from the scaffolds — a finding with
+  // no action behind it.
+  //
+  // Declaring the scale is the intentionality signal (the same precedent the
+  // type-scale check already uses for pinned sizes). Values drawn FROM the scale
+  // are disciplined by construction however many there are; only values outside
+  // it count toward sprawl.
+  const declared = new Set(Object.values(variables.spacing ?? {}).filter((v): v is number => typeof v === 'number'));
   const uniqueValues = new Set(allValues.map((v) => v.value)).size;
-  if (uniqueValues > 6) {
+  const undeclared = new Set(allValues.map((v) => v.value).filter((v) => !declared.has(v)));
+  const sprawl = declared.size > 0 ? undeclared.size : uniqueValues;
+  if (sprawl > 6) {
     issues.push({
       category: 'spacing',
       severity: 'info',
       nodeId: entries[0].node.id,
-      message: `Design uses ${uniqueValues} unique spacing values. Consider consolidating to 4-6 values.`,
+      message: declared.size > 0
+        ? `Design uses ${sprawl} spacing values that are not on its declared scale (${uniqueValues} unique in total). Consolidate onto the scale.`
+        : `Design uses ${uniqueValues} unique spacing values and declares no spacing scale. Consider consolidating to 4-6 values, or declare a scale with set_variables.`,
     });
   }
 
   let score = 100 - (offScaleCount / allValues.length) * 60;
-  if (uniqueValues > 6) score -= 15;
-  if (uniqueValues > 10) score -= 10;
+  if (sprawl > 6) score -= 15;
+  if (sprawl > 10) score -= 10;
   return { score: Math.max(0, Math.min(100, Math.round(score))), issues };
 }
 
@@ -753,27 +771,22 @@ function checkConsistency(entries: NodeEntry[], ctx: ConsistencyContext = {}): C
     }
   }
 
-  // Sibling padding uniformity
-  for (const { node } of entries) {
-    if (!node.children || node.children.length < 2) continue;
-    const childPaddings = node.children
-      .map((c) => (typeof c.padding === 'number' ? c.padding : Array.isArray(c.padding) ? JSON.stringify(c.padding) : null))
-      .filter(Boolean);
-    if (childPaddings.length >= 2) {
-      const unique = new Set(childPaddings.map(String));
-      if (unique.size > 1) {
-        score -= 5;
-        issues.push({
-          category: 'consistency',
-          severity: 'info',
-          nodeId: node.id,
-          nodeName: node.name,
-          message: `Sibling nodes in "${node.name ?? node.id}" have inconsistent padding values.`,
-          suggestion: `Unify padding across sibling elements.`,
-        });
-      }
-    }
-  }
+  // Phase 29 slice D (#194) — the sibling-padding uniformity check is GONE, and
+  // deliberately so; this note exists to stop it being reinvented from first
+  // principles. It fired on correct designs and could not be satisfied.
+  //
+  // Evidence from the checkout attempt: fixing it at one level of the tree moved
+  // the complaint to another, because each fix changed which siblings differed —
+  // document root → left column → summary rail → basket card → order options, in
+  // a loop. The premise is wrong twice over. A page's structural bands are
+  // SUPPOSED to differ (a thin utility strip, a taller header, a padded main
+  // region), and a card's internal padding is a per-component decision, not
+  // something that should match the card next to it. It also cost 5 points per
+  // occurrence, so it materially pinned scores on designs with nothing wrong.
+  //
+  // Nothing replaced it: no defect case was found that this caught and no other
+  // check does. Real padding problems surface through the spacing scale (off-scale
+  // values) and through stress (a box that cannot hold its content).
 
   // ── Phase 25 slice E — token-detachment lint (score-neutral, cap 20) ──
   // A literal that EQUALS a token's value is drift-in-waiting: the token
@@ -1295,14 +1308,29 @@ function tellHonestContent(ctx: ClicheCtx): EvaluationIssue[] {
 function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
   if (ctx.relaxed.has('eyebrow-rhythm')) return [];
 
+  // Phase 29 slice D (#194) — these were hard pixel constants (an eyebrow ≤ 14px,
+  // a heading ≥ 28px), which only held while designs carried literal sizes. Once
+  // a screen references type ROLES the same design lands wherever the
+  // personality's scale puts it: `soft` sets section heads at 25px and
+  // `data-dense` at 19px, so a fixed 28 stopped recognising sections at all and
+  // the eyebrow-to-section ratio collapsed on a design that had not changed.
+  // Read the thresholds off the canvas's OWN scale when it declares one; keep the
+  // constants as the fallback for canvases that don't.
+  const roleSize = (role: string): number | undefined => {
+    const spec = ctx.tokens.typography?.[role] as { fontSize?: number | string } | undefined;
+    return typeof spec?.fontSize === 'number' ? spec.fontSize : undefined;
+  };
+  const eyebrowMax = Math.max(roleSize('label') ?? 0, roleSize('caption') ?? 0) || 14;
+  const headingMin = roleSize('heading') ?? 28;
+
   const isEyebrowText = (n: SceneNode): boolean => {
     if (n.type !== 'text' || typeof n.content !== 'string' || n.content.trim().length === 0) return false;
-    if ((typeof n.fontSize === 'number' ? n.fontSize : 16) > 14) return false;
+    if ((typeof n.fontSize === 'number' ? n.fontSize : 16) > eyebrowMax) return false;
     // The signature: small text that is uppercased or letter-spaced (a label,
     // not body copy). Either property qualifies; both is the canonical eyebrow.
     return n.textTransform === 'uppercase' || (typeof n.letterSpacing === 'number' && n.letterSpacing > 0);
   };
-  const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= 28;
+  const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= headingMin;
 
   // Phase 28 — the KPI-card signature: an uppercase/tracked label that sits
   // beside a large tabular figure labels a METRIC, not a section. Detected
