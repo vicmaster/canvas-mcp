@@ -1517,17 +1517,32 @@ function tellPureBlackWhite(ctx: ClicheCtx): EvaluationIssue[] {
   return issues;
 }
 
-// FR-11 — accent consistency: one accent hue per page (+ neutrals, at most one
-// status color). Three or more competing saturated hues read as unfocused.
-// Suggest-only — which hue is canonical is a judgment call. Neutrals, near-
-// black/white, and the page background are excluded; gradients (non-parseable
-// CSS strings) fall through to null and are skipped.
+// FR-11 — accent consistency: one accent hue per page, plus neutrals and the
+// design system's status vocabulary. Three or more competing saturated hues
+// read as unfocused. Suggest-only — which hue is canonical is a judgment call.
+// Neutrals, near-black/white, and the page background are excluded; gradients
+// (non-parseable CSS strings) fall through to null and are skipped.
 function tellAccentConsistency(ctx: ClicheCtx): EvaluationIssue[] {
   if (ctx.relaxed.has('accent-consistency')) return [];
   const rootId = ctx.entries[0]?.node.id;
   const hues = new Map<number, string>();               // coarse hue bucket → example hex
 
-  const consider = (v: unknown): void => {
+  // Phase 29 follow-up — a colour reached through $success / $warning / $danger
+  // is the system's STATUS vocabulary, not a competing accent. This check used
+  // to count them, so a screen using savings-green, remove-red and low-stock
+  // amber together read as three competing accents. Because every cliché tell
+  // is directive-BLOCKING regardless of severity, that made a correct design
+  // unpresentable, and the only suggestion on offer was to delete legitimate
+  // semantics — the same "gate you cannot satisfy by improving the design"
+  // that slice D removed from the score.
+  //
+  // The token reference is the intentionality signal, exactly as in the
+  // accent-hue tell's $chart-* / $*-tint exemption: a LITERAL #22c55e still
+  // counts as an accent, because nothing declares it to be a status colour.
+  const STATUS_TOKEN = /^\$(success|warning|danger)$/;
+
+  const consider = (v: unknown, raw: unknown): void => {
+    if (typeof raw === 'string' && STATUS_TOKEN.test(raw)) return;
     if (typeof v !== 'string') return;
     const rgb = parseColor(v);
     if (!rgb) return;
@@ -1542,10 +1557,11 @@ function tellAccentConsistency(ctx: ClicheCtx): EvaluationIssue[] {
 
   for (const { node } of ctx.entries) {
     if (node.id === rootId) continue;                    // page background isn't an accent
-    consider(node.color);
-    consider(node.stroke);
-    consider(node.iconColor);
-    if (isSmallEl(node)) consider(node.fill);
+    const raw = ctx.rawById.get(node.id);
+    consider(node.color, raw?.color);
+    consider(node.stroke, raw?.stroke);
+    consider(node.iconColor, raw?.iconColor);
+    if (isSmallEl(node)) consider(node.fill, raw?.fill);
   }
   if (hues.size < 3) return [];
 
@@ -1555,7 +1571,7 @@ function tellAccentConsistency(ctx: ClicheCtx): EvaluationIssue[] {
     severity: 'info',
     nodeId: rootId,
     message: `${hues.size} competing accent hues in use (${[...hues.values()].join(', ')}) — multiple accents read as unfocused.`,
-    suggestion: `Pick one accent hue (plus neutrals, and at most one status color). Set it as $accent and reuse.`,
+    suggestion: `Pick one accent hue and reuse it as $accent — neutrals and the status vocabulary ($success / $warning / $danger, referenced as tokens) don't count against this.`,
   }];
 }
 

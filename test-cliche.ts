@@ -512,6 +512,32 @@ I(page, {type:"frame", width:120, height:48, cornerRadius:8, fill:"#2563EB"})
 I(page, {type:"text", content:"Learn more", fontSize:14, color:"#2563EB"})
 I(page, {type:"text", content:"Body copy here", fontSize:16, color:"#CBD5E1"})`);
   assert(tells(await cliche(focused), 'accent-consistency').length === 0, 'one accent + neutrals does not flag');
+
+  // Phase 29 follow-up (#194) — the design system's STATUS vocabulary is not a
+  // set of competing accents. A commerce screen showing savings in $success,
+  // remove in $danger and low-stock in $warning used to flag, and because every
+  // cliché tell is directive-BLOCKING regardless of severity, that made a
+  // correct design unpresentable with no honest fix.
+  const statuses = build('status-vocab', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16, fill:"#FFFFFF"})
+I(page, {type:"frame", width:120, height:48, cornerRadius:8, fill:"$accent"})
+I(page, {type:"text", content:"Free shipping", fontSize:16, color:"$success"})
+I(page, {type:"text", content:"Remove", fontSize:16, color:"$danger"})
+I(page, {type:"text", content:"Only 2 left", fontSize:16, color:"$warning"})`);
+  statuses.variables = { colors: { accent: '#2563EB', success: '#007F38', danger: '#BC4A41', warning: '#956300' } };
+  assert(tells(await cliche(statuses), 'accent-consistency').length === 0,
+    'accent + the status vocabulary through tokens does not flag');
+
+  // ...but the same hues as LITERALS are just competing accents: nothing
+  // declares them to be status colours.
+  const literalStatuses = build('literal-statuses', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:16, fill:"#FFFFFF"})
+I(page, {type:"frame", width:120, height:48, cornerRadius:8, fill:"#2563EB"})
+I(page, {type:"text", content:"Free shipping", fontSize:16, color:"#007F38"})
+I(page, {type:"text", content:"Remove", fontSize:16, color:"#BC4A41"})
+I(page, {type:"text", content:"Only 2 left", fontSize:16, color:"#956300"})`);
+  assert(tells(await cliche(literalStatuses), 'accent-consistency').length === 1,
+    'the same hues as literals still flag');
 }
 
 async function main() {
