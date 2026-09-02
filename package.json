@@ -12,6 +12,9 @@
     "dist",
     "docs/GUIDELINES.md"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",

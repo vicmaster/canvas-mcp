@@ -1,0 +1,68 @@
+# Runs the test suite on every pull request and on pushes to master.
+#
+# Two jobs, split by cost. Roughly a third of the suite drives a real browser,
+# and downloading Chrome dominates that job's runtime — so the Node-only tests
+# run on their own and report in a couple of minutes, which is the feedback
+# that matters for almost every change. See docs/specs/CI-SPEC.md.
+#
+# No secrets are needed. The tests that would use an LLM API key skip when one
+# is absent, so this stays useful on pull requests from forks.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# A new push supersedes the previous run on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: build + tests (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lower bound is what package.json's `engines` field claims, so the
+        # claim stays honest; the upper is what development actually runs on.
+        node: ['22', '24']
+    env:
+      # This job never launches a browser, and Chrome is ~150MB of the install.
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # `tsc` with noEmit off is the type check — it is the same compile the
+      # published package depends on, so a separate lint step would be noise.
+      - run: npm run build
+      - run: npm run test:fast
+
+  browser:
+    name: browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      # `puppeteer` (not puppeteer-core) is a dependency, so its postinstall
+      # fetches the pinned Chrome build here. Cached across runs by version, so
+      # only a Puppeteer bump pays the download again.
+      - name: Cache Puppeteer's Chrome
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:full
