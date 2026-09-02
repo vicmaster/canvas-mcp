@@ -152,14 +152,20 @@ I(grid, {type: "frame", width: 200, height: 120, gradient: {type: "linear", angl
   `, resp);
 
   const respResolved = resolveVariables(resp.root, resp.variables);
-  const respHtml = renderToHtml(respResolved, 1440, 900, resp);
 
   const bps = [
     { label: 'mobile', width: 390, height: 844 },
     { label: 'tablet', width: 768, height: 1024 },
     { label: 'desktop', width: 1440, height: 900 },
   ];
-  const responsive = await takeResponsiveScreenshots(respHtml, bps);
+  // Render per breakpoint, matching how `screenshot_responsive` calls this: the
+  // body scaffold has to match the viewport for true reflow. This used to pass
+  // one pre-rendered string, which stopped being the signature when that fix
+  // landed — the call had been throwing ever since.
+  const responsive = await takeResponsiveScreenshots(
+    (bp) => renderToHtml(respResolved, bp.width, bp.height, resp),
+    bps,
+  );
   for (const r of responsive) {
     await saveBase64Png(r.data, `4-responsive-${r.label}.png`);
     console.log(`   → 4-responsive-${r.label}.png (${r.width}x${r.height})`);

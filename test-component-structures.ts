@@ -113,11 +113,19 @@ const allIds = (root: SceneNode): string[] => {
   const result = applyStructure(canvas, 'data-table');
   expect('data-table stamps in one call', result.insertedNodeIds.length === 1);
   expect('data-table exposes fillable placeholders', result.placeholders.length >= 12, `got ${result.placeholders.length}`);
-  expect('data-table rows include a status toggle', Object.keys(result.idMap!).some((k) => k === 'dt-row1-status-toggle'));
+  // The status cell is a dot-plus-label indicator, not a toggle. It was a
+  // toggle when this test was written; the scaffold was rebuilt since (row ids
+  // went from `dt-row1-*` to `dt-r1-*`) and the assertion was never updated, so
+  // it sat red through the v2.0.0 release. Pin the shape that exists.
+  const ids = Object.keys(result.idMap!);
+  expect('data-table rows carry a status indicator', ids.includes('dt-r1-status-dot') && ids.includes('dt-r1-status-text'));
 
   const resolved = resolveVariables(canvas.root, { colors: canvas.variables.colors });
   const html = renderToHtml(resolved, 1200, 600, canvas);
-  expect('data-table renders: header + rows + toggle + icon', html.includes('text-transform: uppercase') && html.includes('border-radius: 10px') /* toggle track (h20/2) */ && html.includes('<svg'), undefined);
+  expect('data-table renders: header + rows + status dot + icon',
+    html.includes('text-transform: uppercase')
+    && html.includes('border-radius: 50%') /* the round status dot */
+    && html.includes('<svg'), undefined);
   expect('no unresolved $tokens leak into the render', !html.includes('$bg-') && !html.includes('$text-') && !html.includes('$border'));
 }
 
