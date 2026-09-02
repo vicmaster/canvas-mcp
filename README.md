@@ -1,6 +1,6 @@
 # framesmith
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Release](https://img.shields.io/github/v/release/vicmaster/framesmith)](https://github.com/vicmaster/framesmith/releases) [![MCP](https://img.shields.io/badge/MCP-compatible-1f4838)](https://modelcontextprotocol.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Release](https://img.shields.io/github/v/release/vicmaster/framesmith)](https://github.com/vicmaster/framesmith/releases) [![MCP](https://img.shields.io/badge/MCP-compatible-1f4838)](https://modelcontextprotocol.io) [![CI](https://github.com/vicmaster/framesmith/actions/workflows/ci.yml/badge.svg)](https://github.com/vicmaster/framesmith/actions/workflows/ci.yml)
 
 An open-source MCP server that turns your AI coding agent into a capable UI designer. It gives the agent a visual canvas, a library of vetted design patterns, and a quality bar it must clear before showing you anything — so you review a real, non-slop design in the browser and agree on it *before* any framework code is written.
 
