@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
-import { getCanvas, listCanvases, archiveCanvas, unarchiveCanvas, deleteCanvas, ensureFresh, touchCanvas } from './scene-graph.js';
+import { getCanvas, listCanvases, archiveCanvas, unarchiveCanvas, deleteCanvas, ensureFresh, touchCanvas, type CanvasSummary } from './scene-graph.js';
 import { resolveVariables } from './variables.js';
 import { renderToHtml } from './renderer.js';
 import { getProject, listProjects, listWorkspaces, getCanvasTokens, getProjectDesignSystem, getWorkspaceDesignSystem } from './workspaces.js';
@@ -484,7 +484,12 @@ export async function renderProjectPage(projectId: string, port: number): Promis
   const ws = listWorkspaces().find((w) => w.id === project.workspaceId);
   const wsName = ws?.name ?? 'Personal';
 
-  const canvases = listCanvases().filter((c) => c.projectId === projectId && !c.archived);
+  // One listing for the whole render: it version-hashes every canvas in the
+  // store, so it is the most expensive call on this path and must not be
+  // repeated per card.
+  const allRows = listCanvases();
+  const statesById = new Map(allRows.map((r) => [r.id, r.variants?.map((v) => v.state) ?? []]));
+  const canvases = allRows.filter((c) => c.projectId === projectId && !c.archived);
   // Phase 24 slice A — a screen and its state variants are ONE card: variants
   // whose base is in this listing fold into the base card as chips. A variant
   // whose base is missing (orphan) or lives elsewhere stays a standalone card.
@@ -497,7 +502,7 @@ export async function renderProjectPage(projectId: string, port: number): Promis
     const date = new Date(c.createdAt).toLocaleString();
     const isEmpty = !canvas.root.children || canvas.root.children.length === 0;
     // Phase 19 Slice A — gallery score badge (fast eval, cached; empty → none).
-    const ev = await evalFor(canvas);
+    const ev = await evalFor(canvas, statesById.get(c.id) ?? []);
     const scoreBadge = ev
       ? `<div class="card-score" style="color:${scoreColor(ev.overallScore)}" title="Heuristic quality score">${ev.overallScore}</div>`
       : '';
@@ -829,19 +834,25 @@ ${FAVICON_HTML}
 const scoreCache = new Map<string, EvaluationResult>();
 
 /** FNV-1a over the evaluation's actual inputs. Exported for tests. */
-/** The state variants designed for a canvas (sibling lookup, non-archived). */
-function designedStatesFor(canvasId: string): string[] {
-  return listCanvases().find((r) => r.id === canvasId)?.variants?.map((v) => v.state) ?? [];
+/** The state variants designed for a canvas (sibling lookup, non-archived).
+ *
+ * `listing` exists because this is called once per canvas while rendering a
+ * gallery, and `listCanvases()` version-hashes every canvas in the store on
+ * every call — so looking it up per card made a page render quadratic (a
+ * 43-canvas project did ~7,600 whole-canvas hashes and spent 2s of a 2.2s
+ * response inside this one line). Pass the listing the caller already has. */
+function designedStatesFor(canvasId: string, listing?: CanvasSummary[]): string[] {
+  return (listing ?? listCanvases()).find((r) => r.id === canvasId)?.variants?.map((v) => v.state) ?? [];
 }
 
-export function evalCacheKey(canvas: Canvas): string {
+export function evalCacheKey(canvas: Canvas, states?: string[]): string {
   const genre = (canvas.metadata?.provenance as { preset?: string } | undefined)?.preset ?? '';
   let tokens = '';
   try { tokens = JSON.stringify(getCanvasTokens(canvas)); } catch { /* mirrored canvas with no live project — tree + genre still key it */ }
   // Phase 24 slice C — the coverage check reads the canvas's designed state
   // variants, so adding/removing a variant must invalidate the base's score.
-  const states = designedStatesFor(canvas.id).sort().join(',');
-  const payload = `${JSON.stringify(canvas.root)}|${tokens}|${genre}|${JSON.stringify(canvas.components ?? {})}|${states}`;
+  const stateKey = (states ?? designedStatesFor(canvas.id)).slice().sort().join(',');
+  const payload = `${JSON.stringify(canvas.root)}|${tokens}|${genre}|${JSON.stringify(canvas.components ?? {})}|${stateKey}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < payload.length; i++) {
     h ^= payload.charCodeAt(i);
@@ -850,15 +861,16 @@ export function evalCacheKey(canvas: Canvas): string {
   return `${canvas.id}:${(h >>> 0).toString(36)}`;
 }
 
-async function evalFor(canvas: Canvas): Promise<EvaluationResult | null> {
+async function evalFor(canvas: Canvas, states?: string[]): Promise<EvaluationResult | null> {
   if (!canvas.root.children || canvas.root.children.length === 0) return null; // empty → no score
-  const key = evalCacheKey(canvas);
+  const designed = states ?? designedStatesFor(canvas.id);
+  const key = evalCacheKey(canvas, designed);
   const hit = scoreCache.get(key);
   if (hit) return hit;
   try {
     // Match the agent: relax tells for the canvas's own genre (provenance preset).
     const genre = (canvas.metadata?.provenance as { preset?: string } | undefined)?.preset;
-    const result = await evaluateCanvas(canvas, { mode: 'fast', genre, designedStates: designedStatesFor(canvas.id) });
+    const result = await evaluateCanvas(canvas, { mode: 'fast', genre, designedStates: designed });
     if (scoreCache.size > 200) scoreCache.delete(scoreCache.keys().next().value as string);
     scoreCache.set(key, result);
     return result;
