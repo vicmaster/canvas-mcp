@@ -537,9 +537,18 @@ The checkout attempt (2026-08-15) asked whether v2.0.0 holds on a screen type de
 - [x] Slice D — advisory honesty: the unsatisfiable sibling-padding check removed outright (it fired on correct designs and relocated rather than resolved), spacing variety recalibrated against the canvas's declared scale, the directive no longer withholding readiness when nothing blocking remains, and — carried over from slice C's type-role work rather than scoped here — the eyebrow/heading cliché thresholds made scale-relative so they still recognize sections under a personality's own type scale
 - [x] Slice E — renderer and capture: `responsive: "fixed"` withdrawn from the scene-graph vocabulary (it was documented for four releases while the renderer never read it — a false opt-out, since the two real hints are both opt-in and a hint-less container already never reflows), and `screenshot` gained a `fullPage` option to capture a design taller than its artboard (default off, so existing captures stay byte-identical). The spec's third item, an oversized-artboard duplicate page band, did not reproduce under two controlled attempts and is recorded here as not reproducible rather than fixed.
 
-All five slices are now merged or in flight; what remains before the phase can close is the acceptance proof itself — a checkout re-run with no dodges at ≥ 95, light and dark — which has not yet been run.
+All five slices are merged, and the acceptance proof has been run: the checkout was rebuilt from the same inputs with none of the four workarounds and scored 100/100 with a clean stress run in both the light and dark themes, against a 77 baseline. The phase is closed.
 
 _Full spec-driven breakdown in [`docs/specs/PHASE-29-SPEC.md`](docs/specs/PHASE-29-SPEC.md). Deliberately out of scope: a checkout archetype and a product-image primitive (craft work that belongs on top of a correct evaluator), and flow-shaped state coverage (a larger design question)._
+
+### Continuous integration (infrastructure)
+
+Nothing runs on a pull request today: no workflow, no branch protection, no checks. That held because a single disciplined maintainer ran things by hand, but it has already failed silently — the repository has 102 test files and no `test` script to run them as a suite, and two tests were found failing at the v2.0.0 tag itself. The missing runner is the root cause; a pipeline that is red on its first run only teaches you to ignore the red X.
+
+- [ ] Slice A — a tiered runner (`test:fast` / `test:full`), the interactive viewer test excluded by name, `test-cli` moved to the Chrome tier, the stale `data-table` assertions rewritten against the scaffold as it exists now, the tabular-figures advisory regression investigated and settled in whichever direction the evidence supports, and the network/API-key tests confirmed to skip rather than fail when offline or keyless
+- [ ] Slice B — a GitHub Actions workflow on pull requests and pushes to master: a fast job (build as type check, plus the Chrome-free tier) and a separate Chrome job, no secrets required, with a pinned Node version and a matching `engines` field
+
+_Full breakdown in [`docs/specs/CI-SPEC.md`](docs/specs/CI-SPEC.md). Deliberately out of scope: branch protection (the checks should earn trust before they can block a merge), a test framework (the plain-script convention works; rewriting 102 files is unrelated to what is broken), release automation, and coverage measurement._
 
 ### Issue-driven improvements (post-v1.8)
 

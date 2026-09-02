@@ -121,11 +121,44 @@ c1=I(r1, { type: "frame" })
 I(c1, { type: "text", content: "January" })
 c2=I(r1, { type: "frame" })
 I(c2, { type: "text", content: "$1,204.55" })
+r2=I(t, { type: "frame", layout: "horizontal", gap: 16 })
+d1=I(r2, { type: "frame" })
+I(d1, { type: "text", content: "February" })
+d2=I(r2, { type: "frame" })
+I(d2, { type: "text", content: "$980.10" })
 `, c);
   const rn = await typographyIssues(c);
   const nudge = rn.issues.filter((i) => i.message.includes('proportional figures'));
-  check('numeric cell w/o tabularNums → autofixable info', nudge.length === 1 && nudge[0].fix?.op.includes('tabularNums: true'), JSON.stringify(nudge));
+  check('numeric cell w/o tabularNums → autofixable info — one per data row',
+    nudge.length === 2 && nudge.every((i) => i.fix?.op.includes('tabularNums: true')), JSON.stringify(nudge));
   check('word cells not flagged', !rn.issues.some((i) => i.message.includes('"January"')));
+
+  // The fixture above carries a header and TWO data rows on purpose. It used to
+  // have one, and this check sat red from Phase 28 onward: an unnamed frame now
+  // needs three same-shaped rows before it reads as a table, so a header plus a
+  // single row is a layout, not data. That narrowing was deliberate — the
+  // detector comment in drift.ts calls the lost header-plus-one-row table an
+  // accepted trade — so the fixture moves rather than the threshold. Pinning
+  // the trade here keeps it a decision instead of a silent regression.
+  {
+    const two = createCanvas('Two-Row Table');
+    parseAndExecute(two.root, `
+t=I("document", { type: "frame", layout: "vertical", gap: 0 })
+h=I(t, { type: "frame", layout: "horizontal", gap: 16 })
+h1=I(h, { type: "frame" })
+I(h1, { type: "text", content: "MONTH" })
+h2=I(h, { type: "frame" })
+I(h2, { type: "text", content: "REVENUE" })
+r1=I(t, { type: "frame", layout: "horizontal", gap: 16 })
+c1=I(r1, { type: "frame" })
+I(c1, { type: "text", content: "January" })
+c2=I(r1, { type: "frame" })
+I(c2, { type: "text", content: "$1,204.55" })
+`, two);
+    const rt2 = await typographyIssues(two);
+    check('header + one row is not a table, so no numeric nudge',
+      !rt2.issues.some((i) => i.message.includes('proportional figures')));
+  }
 
   // Advisories are score-neutral: same canvas with the fix applied scores the same.
   const before = rn.score;

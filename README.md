@@ -1239,7 +1239,10 @@ npm run build
 | `npm run build` | Compile TypeScript to `dist/`. Required before the installed MCP server picks up changes — it loads `dist/index.js`. |
 | `npm run dev` | Run the server directly via `tsx` for local iteration. Does not affect the registered MCP server. |
 | `npm run viewer [port]` | Start the standalone viewer (default auto-picks from 3001). |
-| `npx tsx test-*.ts` | Run ad-hoc test scripts at the repo root. |
+| `npm test` | Run every test that needs only Node (~2 min). Alias for `test:fast`. |
+| `npm run test:full` | The above plus the browser-driven tests. Needs Chrome — `npx puppeteer browsers install chrome`. |
+| `npx tsx scripts/run-tests.ts <substring>` | Run just the tests whose filename matches. |
+| `npx tsx test-*.ts` | Run a single test script directly. |
 
 ### Env vars
 
