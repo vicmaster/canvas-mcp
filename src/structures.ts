@@ -1147,23 +1147,26 @@ function tableRow(id: string): SceneNode {
         ],
       },
       {
-        id: `${id}-role`, type: 'frame', width: '18%', layout: 'horizontal',
+        id: `${id}-role`, type: 'frame', width: '18%', layout: 'horizontal', minWidth: 0,
         children: [{
           id: `${id}-role-chip`, type: 'frame', layout: 'horizontal', alignItems: 'center', padding: [SPACE.xs2, SPACE.xs],
-          cornerRadius: 999, fill: COLOR.bgElevated,
-          children: [{ id: `${id}-role-text`, type: 'text', content: 'Role', fontSize: TYPE.caption, color: COLOR.textSecondary }],
+          cornerRadius: 999, fill: COLOR.bgElevated, minWidth: 0, overflow: 'hidden',
+          children: [{ id: `${id}-role-text`, type: 'text', content: 'Role', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' }],
         }],
       },
       {
-        id: `${id}-status`, type: 'frame', width: '18%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2,
+        id: `${id}-status`, type: 'frame', width: '18%', layout: 'horizontal', alignItems: 'center', gap: SPACE.xs2, minWidth: 0,
         children: [
           { id: `${id}-status-dot`, type: 'ellipse', width: 8, height: 8, fill: '$success' },
-          { id: `${id}-status-text`, type: 'text', content: 'Status', fontSize: TYPE.caption, color: COLOR.textSecondary },
+          { id: `${id}-status-text`, type: 'text', content: 'Status', fontSize: TYPE.caption, color: COLOR.textSecondary, textOverflow: 'ellipsis' },
         ],
       },
       {
-        id: `${id}-amount`, type: 'frame', width: '18%', layout: 'horizontal', justifyContent: 'end',
-        children: [{ id: `${id}-amount-text`, type: 'text', content: 'Amount — TBD', fontSize: TYPE.textSm, color: COLOR.textPrimary, tabularNums: true }],
+        // The identity cell above has carried minWidth + ellipsis since Phase 29;
+        // these three columns never got it, and overflowed on Linux where the
+        // fonts are wider than the macOS metrics the sweep was run against.
+        id: `${id}-amount`, type: 'frame', width: '18%', layout: 'horizontal', justifyContent: 'end', minWidth: 0,
+        children: [{ id: `${id}-amount-text`, type: 'text', content: 'Amount — TBD', fontSize: TYPE.textSm, color: COLOR.textPrimary, tabularNums: true, textOverflow: 'ellipsis' }],
       },
       {
         id: `${id}-actions`, type: 'frame', width: '12%', layout: 'horizontal', justifyContent: 'end',
