@@ -885,11 +885,12 @@ const auth: Structure = {
               id: 'au-fields', type: 'frame', width: '100%', layout: 'vertical', gap: SPACE.md,
               children: [field('au-email', 'Email'), field('au-password', 'Password')],
             },
-            {
-              id: 'au-submit', type: 'frame', name: 'Submit', width: '100%', layout: 'horizontal',
-              alignItems: 'center', justifyContent: 'center', padding: [SPACE.xs, SPACE.lg], cornerRadius: RADIUS.sm, fill: COLOR.accent,
-              children: [{ id: 'au-submit-label', type: 'text', content: 'Continue', fontSize: TYPE.body, fontWeight: 600, color: COLOR.bgPrimary }],
-            },
+            // Hand-rolled until CI caught it: this was the one button in the
+            // library not built from `button()`, so it missed the minWidth /
+            // overflow / ellipsis hardening and clipped under a long label.
+            // It only failed on Linux — macOS font metrics left just enough
+            // room — which is why the Phase 29 scaffold sweep passed it.
+            { ...button('au-submit', 'Continue', COLOR.accent, COLOR.bgPrimary), name: 'Submit', width: '100%' },
             { id: 'au-alt', type: 'text', content: 'Secondary link', fontSize: TYPE.textSm, fontWeight: 500, color: COLOR.accent, textAlign: 'center' },
           ],
         },
