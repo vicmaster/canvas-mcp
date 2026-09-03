@@ -12,13 +12,17 @@ An open-source MCP server that turns your AI coding agent into a capable UI desi
 
 ### What an agent actually ships
 
-Both screens below were built end-to-end by an agent with framesmith's own vocabulary — one `generate_design_system` call each (a seed color + a personality), stamped patterns, data-bound charts, and every quality gate cleared (score ≥ 95, states designed, stress-tested, both themes):
+Every screen below was built end-to-end by an agent with framesmith's own vocabulary — one `generate_design_system` call each (a seed color + a personality), stamped patterns, real controls, and every quality gate cleared (score ≥ 95, states designed, stress-tested, both themes):
 
 ![A customer-support dashboard built by an agent in framesmith, light theme: sidebar with grouped navigation and an account row, four KPI cards (tickets resolved, first reply, SLA breaches, CSAT) with sparklines and tinted delta pills, a tickets-per-day bar chart with a highlighted day and a floating tooltip, a data-bound tickets-by-channel donut with a center total and legend, an agent-workload table with tinted status chips, and a top-performers panel. Generated from one seed (#2563EB) on the "technical" personality.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-support-dashboard.png?v=2.0)
 
 ![An API platform console built by the same toolkit, dark theme: teal design system on the "data-dense" personality with JetBrains Mono figures — request/error-rate/latency KPI cards with sparklines, a requests-per-day bar chart with a highlighted day, a traffic-by-endpoint donut, a deployments table with Live/Rolling/Degraded status chips, and a top-consumers panel.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-api-console.png?v=2.0)
 
 > Same machinery, different seed + personality: a light ops dashboard and a dark API console. Every color pair is AA by construction, every chart is data-bound (edit a value, not an SVG path), and the dark theme is generated — not inverted.
+
+![A specialty-coffee checkout built by an agent in framesmith, light theme: a masthead with the store mark and a secure-checkout note, a form column with Contact, Delivery and Payment sections — real radio, checkbox and input controls, a two-option delivery-speed selector — beside a sticky order summary listing two line items, subtotal, free delivery, a first-order credit, the total, and a Place order button, with a gift-code card beneath. Generated from one seed (#A24B1E) on the "soft" personality and stamped with the commerce genre.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-checkout.png?v=2.1)
+
+> Not every screen is a dashboard. This checkout carries the `commerce` genre — the transactional counterpart to `dashboard` — so the evaluator reads its line prices and total as the design rather than as fabricated data. It still cleared the same bar as the two screens above, including designed **empty-basket** and **loading** states.
 
 ```
 MCP Client → stdio → framesmith server
