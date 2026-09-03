@@ -22,7 +22,7 @@ Every screen below was built end-to-end by an agent with framesmith's own vocabu
 
 ![A specialty-coffee checkout built by an agent in framesmith, light theme: a masthead with the store mark and a secure-checkout note, a form column with Contact, Delivery and Payment sections — real radio, checkbox and input controls, a two-option delivery-speed selector — beside a sticky order summary listing two line items, subtotal, free delivery, a first-order credit, the total, and a Place order button, with a gift-code card beneath. Generated from one seed (#A24B1E) on the "soft" personality and stamped with the commerce genre.](https://raw.githubusercontent.com/vicmaster/framesmith/master/docs/framesmith-checkout.png?v=2.1)
 
-> Not everything is a dashboard. The checkout carries the `commerce` genre, so the evaluator reads its line prices and total as the design rather than as fabricated data — and it still had to clear the same bar as the two screens above, including designed **empty-basket** and **loading** states.
+> Not every screen is a dashboard. This checkout carries the `commerce` genre — the transactional counterpart to `dashboard` — so the evaluator reads its line prices and total as the design rather than as fabricated data. It still cleared the same bar as the two screens above, including designed **empty-basket** and **loading** states.
 
 ```
 MCP Client → stdio → framesmith server
