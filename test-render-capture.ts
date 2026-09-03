@@ -17,11 +17,13 @@ import './test-env.js';
  *
  * Needs Chrome for the capture case. Run with: npx tsx test-render-capture.ts
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createCanvas, getCanvas } from './src/scene-graph.js';
 import { parseAndExecute } from './src/operations.js';
 import { renderToHtml } from './src/renderer.js';
-import { takeScreenshot, shutdown } from './src/screenshot.js';
+import { takeScreenshot, exportToFile, shutdown } from './src/screenshot.js';
 
 let allPass = true;
 function check(name: string, cond: boolean, extra?: string) {
@@ -85,6 +87,33 @@ c=I("document", {type:"frame", width:"100%", height:500, fill:"#94A3B8"})
   const again = Buffer.from(await takeScreenshot(html, { width: 800, height: 600, scale: 1, fullPage: true }), 'base64');
   const a = dims(again);
   check('a repeat full capture through the same browser still works', a.h >= 1500, `${a.w}x${a.h}`);
+}
+
+// ── 3. export captures the whole design too ──────────────────────────────────
+{
+  // `fullPage` shipped on `screenshot` and not on `export`, so saving a design
+  // taller than its artboard still meant passing the height by hand. Both now
+  // share one helper; this pins that they agree.
+  const c = createCanvas('tall-export');
+  parseAndExecute(c.root, `
+U("document", {width:800, height:600, layout:"vertical", gap:0, fill:"#FFFFFF"})
+a=I("document", {type:"frame", width:"100%", height:500, fill:"#E2E8F0"})
+b=I("document", {type:"frame", width:"100%", height:500, fill:"#CBD5E1"})
+c=I("document", {type:"frame", width:"100%", height:500, fill:"#94A3B8"})
+`, c);
+  const cv = getCanvas(c.id)!;
+  const html = renderToHtml(cv.root, 800, 600, cv);
+  const dir = mkdtempSync(join(tmpdir(), 'framesmith-export-'));
+
+  const viewportPath = await exportToFile(html, { width: 800, height: 600, scale: 1, format: 'png', outputPath: dir, fileName: 'viewport' });
+  const wholePath = await exportToFile(html, { width: 800, height: 600, scale: 1, format: 'png', outputPath: dir, fileName: 'whole', fullPage: true });
+
+  const dims = (p: string) => { const b = readFileSync(p); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
+  const v = dims(viewportPath);
+  const f = dims(wholePath);
+  check('export default is still exactly the artboard', v.w === 800 && v.h === 600, `${v.w}x${v.h}`);
+  check('export fullPage reaches all 1500px of content', f.h >= 1500, `${f.w}x${f.h}`);
+  check('export width is unaffected either way', f.w === v.w);
 }
 
 console.log(allPass ? '\nAll render-capture tests passed.' : '\nSOME TESTS FAILED');

@@ -34,7 +34,7 @@ Pick the right `width` per node — this is the single biggest lever for respons
 
 **Default to fluid.** Reach for fixed pixel widths only when the content genuinely shouldn't scale.
 
-**Artboard height is a viewport, not a limit.** The root's `height` sizes the default `screenshot` capture, but content taller than it is normal — it scrolls on a real page, and a `clip` finding from `canvas_stress` for exactly that case is `info`, not a problem to fix. To actually see past the artboard (a long page, a design that grew under stress content), pass `fullPage: true` to `screenshot` instead of editing the root height by hand.
+**Artboard height is a viewport, not a limit.** The root's `height` sizes the default `screenshot` capture, but content taller than it is normal — it scrolls on a real page, and a `clip` finding from `canvas_stress` for exactly that case is `info`, not a problem to fix. To actually see past the artboard (a long page, a design that grew under stress content), pass `fullPage: true` to `screenshot` — or to `export`, which takes the same option — instead of editing the root height by hand.
 
 ## Responsive hints
 

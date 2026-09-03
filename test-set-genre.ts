@@ -8,6 +8,7 @@
 
 import './test-env.js';
 import { createCanvas, setCanvasGenre, getCanvas } from './src/scene-graph.js';
+import { applyStructure } from './src/structures.js';
 import { parseAndExecute } from './src/operations.js';
 import { canvasVersionHash } from './src/version.js';
 import { evaluateCanvas, relaxedByGenre, knownGenres } from './src/evaluate.js';
@@ -69,6 +70,29 @@ check('relaxedByGenre: checkout aliases commerce', relaxedByGenre('checkout').jo
 
 // Missing canvas → undefined.
 check('unknown canvas → undefined', setCanvasGenre('nope', 'dashboard') === undefined);
+
+// ── stamping a page structure must not erase the genre ───────────────────────
+{
+  // Found by building the v2.1.0 checkout example. `canvas_set_genre` writes
+  // metadata.provenance.preset; `applyStructure` then recorded its own
+  // provenance by REPLACING the object, so declaring a genre and then stamping
+  // a layout — the order the docs encourage — silently dropped the genre and
+  // the screen's prices went back to being flagged as fabricated. It failed
+  // silently: nothing errored, the evaluation just reported genre.active null.
+  const canvas = createCanvas('genre-then-structure');
+  setCanvasGenre(canvas.id, 'commerce');
+  applyStructure(canvas, 'settings');
+  const after = getCanvas(canvas.id)!;
+  const prov = after.metadata?.provenance as { preset?: string; structure?: string } | undefined;
+
+  check('the genre survives a page-structure stamp', prov?.preset === 'commerce', `preset=${prov?.preset}`);
+  check('...and the structure is recorded alongside it', prov?.structure === 'settings', `structure=${prov?.structure}`);
+
+  // The evaluator is what actually consumes it — assert the end effect, not
+  // just the metadata shape.
+  const r = await evaluateCanvas(after, { mode: 'fast', categories: ['cliche'] });
+  check('...so the evaluator still sees the genre', r.genre?.active === 'commerce', JSON.stringify(r.genre?.active));
+}
 
 console.log(allPass ? '\nAll set-genre tests passed.' : '\nSOME TESTS FAILED');
 process.exit(allPass ? 0 : 1);
