@@ -1305,6 +1305,19 @@ function tellHonestContent(ctx: ClicheCtx): EvaluationIssue[] {
 // *every* section is the template-rhythm tell. Distinct from hanging-header,
 // which scores one eyebrow's placement; this scores their global count vs the
 // section count. Cap: at most ceil(sectionCount / 3) — ~1 eyebrow per 3 sections.
+/** Letter-spacing at or above this reads as a deliberate eyebrow treatment
+ * rather than a type role's default tracking. See the census in
+ * tellEyebrowRhythm for how it was chosen. */
+const EYEBROW_TRACKING_MIN = 1;
+
+/** Text already typed in capitals — the authored equivalent of textTransform.
+ * Needs at least two letters so an acronym-free string ("12 / 24") or a single
+ * initial doesn't read as a label. */
+function readsUppercase(content: string): boolean {
+  const letters = content.replace(/[^\p{L}]/gu, '');
+  return letters.length >= 2 && content === content.toUpperCase();
+}
+
 function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
   if (ctx.relaxed.has('eyebrow-rhythm')) return [];
 
@@ -1326,9 +1339,32 @@ function tellEyebrowRhythm(ctx: ClicheCtx): EvaluationIssue[] {
   const isEyebrowText = (n: SceneNode): boolean => {
     if (n.type !== 'text' || typeof n.content !== 'string' || n.content.trim().length === 0) return false;
     if ((typeof n.fontSize === 'number' ? n.fontSize : 16) > eyebrowMax) return false;
-    // The signature: small text that is uppercased or letter-spaced (a label,
-    // not body copy). Either property qualifies; both is the canonical eyebrow.
-    return n.textTransform === 'uppercase' || (typeof n.letterSpacing === 'number' && n.letterSpacing > 0);
+    // The signature: small text that reads as a designed LABEL rather than as
+    // cramped body copy. Three ways to qualify, and the third is the calibrated
+    // one:
+    //   - textTransform: 'uppercase' — the explicit form
+    //   - content already typed in capitals ("MODULES", "YEAR TO DATE") — the
+    //     same thing authored differently, and the most common form in practice
+    //   - tracking heavy enough to be a deliberate styling choice
+    //
+    // Any tracking at all used to qualify, and that was the bug: a personality
+    // can set letterSpacing on its `label` type role, so every small label in a
+    // design inherited an eyebrow signal it never asked for. Eleven ordinary
+    // form fields ("Email", "Full name", "City") were counted as eyebrows on the
+    // v2.1.0 checkout example.
+    //
+    // The threshold is measured, not guessed. Across the 112-canvas corpus the
+    // tell counted 393 texts: 154 by textTransform, 221 by capitalised content,
+    // and 18 by tracking alone — and every one of those 18 was a form label or a
+    // tab. Their tracking runs 0.3 to 0.6, inherited from a type role. Tracking
+    // that is a deliberate eyebrow choice sits at 1 to 2 (the genuine
+    // capitalised labels reach 1.5, the fixtures below use 2). A floor of 1
+    // separates the two classes with margin on both sides and changed no
+    // canvas's verdict in the corpus.
+    if (n.textTransform === 'uppercase') return true;
+    const tracking = typeof n.letterSpacing === 'number' ? n.letterSpacing : 0;
+    if (tracking <= 0) return false;
+    return readsUppercase(n.content) || tracking >= EYEBROW_TRACKING_MIN;
   };
   const isHeading = (n: SceneNode): boolean => n.type === 'text' && (typeof n.fontSize === 'number' ? n.fontSize : 16) >= headingMin;
 
