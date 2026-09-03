@@ -354,6 +354,43 @@ I(s2, {type:"text", content:"Section two", fontSize:11, letterSpacing:2})
 I(s2, {type:"text", content:"Heading two", fontSize:36})`);
   assert(tells(await cliche(ls), 'eyebrow-rhythm').length === 1, 'letter-spaced labels count as eyebrows');
 
+  // …but only when the tracking is a deliberate choice. A type role that sets a
+  // little letterSpacing (the `soft` personality ships label at 0.25) used to
+  // turn every form field on a screen into an "eyebrow": the v2.1.0 checkout
+  // example had eleven, all of them ordinary labels sitting above inputs. The
+  // census across the canvas corpus put role-inherited tracking at 0.3–0.6 and
+  // deliberate eyebrow tracking at 1–2, so the floor sits at 1.
+  const formLabels = build('eyebrow-form-labels', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:24})
+s1=I(page, {type:"frame", layout:"vertical", gap:8})
+I(s1, {type:"text", content:"Email", fontSize:13, letterSpacing:0.25})
+I(s1, {type:"text", content:"you@example.com", fontSize:16})
+I(s1, {type:"text", content:"Full name", fontSize:13, letterSpacing:0.25})
+I(s1, {type:"text", content:"Rosa Lindqvist", fontSize:16})
+I(s1, {type:"text", content:"Heading one", fontSize:36})
+s2=I(page, {type:"frame", layout:"vertical", gap:8})
+I(s2, {type:"text", content:"City", fontSize:13, letterSpacing:0.25})
+I(s2, {type:"text", content:"Bristol", fontSize:16})
+I(s2, {type:"text", content:"Postcode", fontSize:13, letterSpacing:0.25})
+I(s2, {type:"text", content:"BS1 4TR", fontSize:16})
+I(s2, {type:"text", content:"Heading two", fontSize:36})`);
+  assert(tells(await cliche(formLabels), 'eyebrow-rhythm').length === 0,
+    'lightly-tracked sentence-case form labels are not eyebrows');
+
+  // Capitalised content is an eyebrow however it was authored — typing the caps
+  // instead of setting textTransform is the same design decision, and it is the
+  // most common form in the corpus.
+  const literalCaps = build('eyebrow-literal-caps', `
+page=I("document", {type:"frame", width:1200, layout:"vertical", gap:24})
+s1=I(page, {type:"frame", layout:"vertical", gap:8})
+I(s1, {type:"text", content:"MODULES", fontSize:12, letterSpacing:0.5})
+I(s1, {type:"text", content:"Heading one", fontSize:36})
+s2=I(page, {type:"frame", layout:"vertical", gap:8})
+I(s2, {type:"text", content:"YEAR TO DATE", fontSize:12, letterSpacing:0.5})
+I(s2, {type:"text", content:"Heading two", fontSize:36})`);
+  assert(tells(await cliche(literalCaps), 'eyebrow-rhythm').length === 1,
+    'capitalised content counts even without textTransform');
+
   // at cap: 1 eyebrow across 3 sections → within ceil(3/3)=1
   const atCap = build('eyebrow-atcap', `
 page=I("document", {type:"frame", width:1200, layout:"vertical", gap:24})
