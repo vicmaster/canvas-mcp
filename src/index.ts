@@ -1292,7 +1292,7 @@ Fonts named in typography tokens load automatically at render time — you only 
 // --- export ---
 server.tool(
   'export',
-  'Export a canvas or specific nodes to files (PNG, JPEG, WebP, PDF). Writes files to the specified output directory.',
+  'Export a canvas or specific nodes to files (PNG, JPEG, WebP, PDF). Writes files to the specified output directory. Pass fullPage to capture a design taller than its artboard — the same option screenshot takes.',
   {
     canvasId: z.string().describe('Canvas ID'),
     format: z.enum(['png', 'jpeg', 'webp', 'pdf']).describe('Export format'),
@@ -1302,8 +1302,9 @@ server.tool(
     height: z.number().optional().describe('Viewport height in pixels (default 900)'),
     scale: z.number().optional().describe('Device scale factor (default 2 for retina)'),
     theme: z.enum(['light', 'dark']).optional().describe('Render theme — "dark" applies the design system\'s dark token layer (dark.colors/dark.elevation overrides); default light. No-op when no dark layer exists.'),
+    fullPage: z.boolean().optional().describe('Capture the whole design rather than one viewport — the same option screenshot takes. A canvas taller than its artboard is otherwise cut off at the artboard height. Default false, so existing exports are unchanged. Ignored for PDF (which paginates) and when nodeIds are given.'),
   },
-  async ({ canvasId, format, outputPath, nodeIds, width, height, scale, theme }) => {
+  async ({ canvasId, format, outputPath, nodeIds, width, height, scale, theme, fullPage }) => {
     const canvas = getCanvas(canvasId);
     if (!canvas) return { content: [{ type: 'text', text: 'Error: Canvas not found' }], isError: true };
 
@@ -1320,7 +1321,7 @@ server.tool(
         exportedFiles.push(filePath);
       }
     } else {
-      const filePath = await exportToFile(html, { width: w, height: h, scale, format, outputPath, fileName: canvas.name.replace(/\s+/g, '-').toLowerCase() });
+      const filePath = await exportToFile(html, { width: w, height: h, scale, format, outputPath, fullPage, fileName: canvas.name.replace(/\s+/g, '-').toLowerCase() });
       exportedFiles.push(filePath);
     }
 

@@ -390,7 +390,7 @@ Render canvas to PNG (returned as base64 image).
 | `nodeId` | string? | Specific node to capture |
 | `width` | number? | Viewport width (default 1440) |
 | `height` | number? | Viewport height (default 900) |
-| `fullPage` | boolean? | Capture the whole design instead of one viewport — default false, so existing captures (diffs, exports, responsive sets, the pattern gate) are byte-identical. A canvas taller than its artboard otherwise cuts off at the artboard height; before this, the only way to see the rest was editing the root height by hand |
+| `fullPage` | boolean? | Capture the whole design instead of one viewport — default false, so existing captures (diffs, responsive sets, the pattern gate) are byte-identical. A canvas taller than its artboard otherwise cuts off at the artboard height. `export` takes the same option (ignored for PDF, which paginates) |
 | `scale` | number? | Device scale (default 2) |
 | `theme` | string? | `"dark"` renders the design system's dark token layer (`dark.colors`/`dark.elevation` overrides); default light — a no-op without a dark layer |
 

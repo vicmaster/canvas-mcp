@@ -1668,9 +1668,20 @@ export function applyStructure(
 
     // Provenance into the open metadata bag (C3). `preset` is filled later by
     // apply_preset (T7); `seed` is reserved (C6).
+    // MERGE, don't replace. A canvas may already carry a genre stamp from
+    // canvas_set_genre (metadata.provenance.preset), and replacing the whole
+    // provenance object silently discarded it — declaring `commerce` and THEN
+    // stamping a layout, which is the order the docs encourage, left the canvas
+    // with no genre at all and its prices flagged as fabricated. apply_preset
+    // has always spread the existing provenance here; this now matches it.
     canvas.metadata = {
       ...canvas.metadata,
-      provenance: { structure: structure.name, axes: structure.axes, at: new Date().toISOString() },
+      provenance: {
+        ...canvas.metadata?.provenance,
+        structure: structure.name,
+        axes: structure.axes,
+        at: new Date().toISOString(),
+      },
     };
   }
 
